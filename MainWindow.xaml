@@ -1,7 +1,7 @@
-<Window x:Class="LmuTelemetryDesktop.MainWindow"
+<Window x:Class="TraceEngineer.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="LMU Race Engineer - Telemetry Analyzer"
+        Title="Trace Engineer - Telemetry Analyzer"
         Height="850" Width="1400"
         Background="#1B1B1C" Foreground="White">
 
@@ -20,6 +20,185 @@
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Background" Value="Transparent"/>
         </Style>
+        <Style x:Key="TabButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="#252528" BorderBrush="#3A3A3E"
+                                BorderThickness="1" Padding="14,5" CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3A3106"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FFCD3C"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="1.5"/>
+                                <Setter Property="Foreground" Value="#FFE28A"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#303038"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#6A6A70"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Bottone neutro: sfondo scuro, bordo sottile, hover che schiarisce -->
+        <Style x:Key="ToolButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#E8E8EE"/>
+            <Setter Property="Background" Value="#2A2A2E"/>
+            <Setter Property="BorderBrush" Value="#3A3A3E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#34343A"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#4A4A52"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3E3E46"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#6A6A70"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#232326"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#303034"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Azione positiva (save): verde tenue -->
+        <Style x:Key="ToolButtonSuccess" TargetType="Button">
+            <Setter Property="Foreground" Value="#7FE0A0"/>
+            <Setter Property="Background" Value="#0F3A1F"/>
+            <Setter Property="BorderBrush" Value="#2E7A4A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#154A28"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3AA065"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1B5A32"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#6A6A70"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#232326"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#303034"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>        
+
+        <!-- Azione primaria: accento giallo, coerente col tab selezionato -->
+        <Style x:Key="ToolButtonAccent" TargetType="Button">
+            <Setter Property="Foreground" Value="#FFE28A"/>
+            <Setter Property="Background" Value="#3A3106"/>
+            <Setter Property="BorderBrush" Value="#8A7420"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#4A3F0A"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FFCD3C"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#57490C"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#6A6A70"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#232326"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#303034"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Azione distruttiva: rosso tenue, mai urlato -->
+        <Style x:Key="ToolButtonDanger" TargetType="Button">
+            <Setter Property="Foreground" Value="#FF9A9A"/>
+            <Setter Property="Background" Value="#3A2326"/>
+            <Setter Property="BorderBrush" Value="#5A3338"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#4A2A2E"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#8A4A50"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#553136"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#6A6A70"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#232326"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#303034"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>                
     </Window.Resources>
 
     <Grid Margin="14">
@@ -32,32 +211,44 @@
 
         <!-- Toolbar -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <Button Content="Open .duckdb file" Width="170" Height="36" Margin="0,0,8,0" Click="OpenDuckDb_Click"/>
-            <Button Content="Export CSV (Excel)" Width="170" Height="36" Margin="0,0,8,0" Click="ExportCsv_Click"/>
+            <Button Content="Open .duckdb file" Style="{StaticResource ToolButton}"
+                    Width="170" Height="36" Margin="0,0,8,0" Click="OpenDuckDb_Click"/>
+            <Button Content="Export CSV (Excel)" Style="{StaticResource ToolButton}"
+                    Width="170" Height="36" Margin="0,0,8,0" Click="ExportCsv_Click"/>
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="13" Foreground="#7FE07F" Margin="14,0,0,0"/>
         </StackPanel>
 
         <!-- Channel selectors -->
-        <WrapPanel Grid.Row="1" Margin="0,0,0,8">
-            <TextBlock Text="Channels:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="White"/>
-            <CheckBox x:Name="ChkSpeed"    Content="Speed"    IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkThrottle" Content="Throttle" IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkBrake"    Content="Brake"    IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkSteering" Content="Steering" IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkRpm"      Content="RPM"      IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkHideShifts" Content="Hide shift cuts" IsChecked="True" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+        <StackPanel Grid.Row="1" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <RadioButton x:Name="RbTabCar"    Content="Car"    GroupName="Tabs" IsChecked="True"
+                             Style="{StaticResource TabButton}" Click="Tab_Click"/>
+                <RadioButton x:Name="RbTabTyres"  Content="Tyres"  GroupName="Tabs"
+                             Style="{StaticResource TabButton}" Click="Tab_Click"/>
+                <RadioButton x:Name="RbTabBrakes" Content="Brakes" GroupName="Tabs"
+                             Style="{StaticResource TabButton}" Click="Tab_Click"/>
 
-            <CheckBox x:Name="ChkSoC"       Content="SoC"        IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkErs"       Content="ERS power"  IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkTyreTemp"  Content="Tyre temp"  IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkTyreWear"  Content="Tyre wear"  IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkBrakeTemp" Content="Brake temp" IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            <CheckBox x:Name="ChkBrakeWear" Content="Brake wear" IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                <TextBlock Text="    X axis:" VerticalAlignment="Center" Margin="10,0,8,0" Foreground="#808085"/>
+                <RadioButton x:Name="RbTime" Content="Time" GroupName="Axis"
+                             VerticalAlignment="Center" Margin="0,0,12,0" Foreground="White" Click="Axis_Click"/>
+                <RadioButton x:Name="RbDistance" Content="Distance" GroupName="Axis" IsChecked="True"
+                             VerticalAlignment="Center" Foreground="White" Click="Axis_Click"/>
+            </StackPanel>
 
-            <TextBlock Text="   X axis:" VerticalAlignment="Center" Margin="10,0,8,0" Foreground="White"/>
-            <RadioButton x:Name="RbTime" Content="Time" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="White" Click="Axis_Click"/>
-            <RadioButton x:Name="RbDistance" Content="Distance" VerticalAlignment="Center" Foreground="White" Click="Axis_Click"/>
-        </WrapPanel>
+            <WrapPanel x:Name="OptionsPanel">
+                <TextBlock Text="Base:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#808085"/>
+                <CheckBox x:Name="ChkSpeed"    Content="Speed"    IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                <CheckBox x:Name="ChkThrottle" Content="Throttle" IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                <CheckBox x:Name="ChkBrake"    Content="Brake"    IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                <CheckBox x:Name="ChkSteering" Content="Steering" IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                <CheckBox x:Name="ChkRpm"      Content="RPM"      IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                <CheckBox x:Name="ChkHideShifts" Content="Hide shift cuts" IsChecked="True" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+
+                <TextBlock Text="   Hybrid:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#808085"/>
+                <CheckBox x:Name="ChkSoC"       Content="SoC"        IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                <CheckBox x:Name="ChkErs"       Content="ERS power"  IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+            </WrapPanel>
+        </StackPanel>
 
         <!-- Session info -->
         <TextBlock Grid.Row="2" x:Name="SessionInfo" FontSize="13" Foreground="#B0B0B0" Margin="0,0,0,8"/>
@@ -94,6 +285,7 @@
                             SelectionMode="Single"
                             PreviewMouseLeftButtonDown="LapsList_PreviewMouseLeftButtonDown"
                             ItemContainerStyle="{StaticResource PlainListBoxItem}"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                             Background="#252528" Foreground="White" BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
@@ -114,7 +306,8 @@
                     </ListBox>
 
                     <Button Grid.Row="3" x:Name="BtnSaveLap" Content="Save selected lap"
-                            Height="30" Margin="8,6" Click="SaveLap_Click" IsEnabled="False"/>
+                            Style="{StaticResource ToolButtonSuccess}"
+                            Height="34" Margin="8,6" Click="SaveLap_Click" IsEnabled="False"/>
 
                     <TextBlock Grid.Row="4" Text="Saved laps (library)" FontSize="13" FontWeight="SemiBold"
                             Foreground="White" Margin="8,10,8,4"/>
@@ -123,6 +316,7 @@
                             SelectionMode="Single"
                             PreviewMouseLeftButtonDown="LapsList_PreviewMouseLeftButtonDown"
                             ItemContainerStyle="{StaticResource PlainListBoxItem}"
+                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                             Background="#252528" Foreground="White" BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
@@ -133,16 +327,18 @@
                                     </Grid.ColumnDefinitions>
                                     <Rectangle Grid.Column="0" Width="6" Fill="{Binding RowBg}"/>
                                     <StackPanel Grid.Column="1" Margin="6,3,4,3">
-                                        <TextBlock Foreground="White" FontWeight="SemiBold">
+                                        <TextBlock Foreground="White" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis">
                                             <Run Text="{Binding LapNumber, StringFormat='L{0}'}"/>
                                             <Run Text=" • "/>
                                             <Run Text="{Binding CarName}"/>
-                                            <Run Text="  "/>
-                                            <Run Text="{Binding LapTimeFormatted}" Foreground="#A0A0A5"/>
                                         </TextBlock>
-                                        <TextBlock FontSize="10" Foreground="#7A7A80">
+                                        <TextBlock FontSize="11" Foreground="#C8C8CE"
+                                                   Text="{Binding LapTimeFormatted}"/>
+                                        <TextBlock FontSize="10" Foreground="#7A7A80"
+                                                   TextTrimming="CharacterEllipsis">
                                             <Run Text="{Binding TrackName}"/>
-                                            <Run Text="  "/>
+                                            <Run Text="  •  "/>
                                             <Run Text="{Binding DisplayDate}"/>
                                         </TextBlock>
                                     </StackPanel>
@@ -151,9 +347,9 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- NUOVO: pulsante per cancellare i giri salvati selezionati -->
                     <Button Grid.Row="6" x:Name="BtnDeleteSavedLap" Content="Delete selected lap"
-                            Height="30" Margin="8,6" Click="DeleteSavedLap_Click"/>
+                            Style="{StaticResource ToolButtonDanger}"
+                            Height="34" Margin="8,6" Click="DeleteSavedLap_Click"/>
 
                     <TextBlock Grid.Row="7" x:Name="TrackRefText" FontSize="10" Foreground="#7FE07F"
                             TextWrapping="Wrap" Margin="8,6"/>
@@ -172,8 +368,22 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Canvas Grid.Row="0" x:Name="ChartCanvas" Background="#1E1E20" ClipToBounds="True" 
-                            SizeChanged="ChartCanvas_SizeChanged"/>
+                    <Canvas Grid.Row="0" x:Name="ChartCanvas" Background="#1E1E20" ClipToBounds="True"
+                        SizeChanged="ChartCanvas_SizeChanged"
+                        MouseMove="ChartCanvas_MouseMove"
+                        MouseLeave="ChartCanvas_MouseLeave"/>
+
+                    <Ellipse Grid.Row="0" x:Name="HoverDot" Width="7" Height="7"
+                            Fill="White" Stroke="Black" StrokeThickness="1"
+                            Visibility="Collapsed" IsHitTestVisible="False"
+                            HorizontalAlignment="Left" VerticalAlignment="Top"/>
+
+                    <Border Grid.Row="0" x:Name="HoverTip" Visibility="Collapsed"
+                            IsHitTestVisible="False" Background="#E61B1B1C"
+                            BorderBrush="#3A3A3E" BorderThickness="1" Padding="6,4"
+                            HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock x:Name="HoverTipText" FontSize="11" Foreground="White"/>
+                    </Border>
 
                     <Slider Grid.Row="1" x:Name="CursorSlider"
                             Minimum="0" Maximum="1000" Value="0"

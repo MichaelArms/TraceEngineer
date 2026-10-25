@@ -1,7 +1,7 @@
 using System.Windows.Media;
 using System.ComponentModel;
 
-namespace LmuTelemetryDesktop.Models;
+namespace TraceEngineer.Models;
 
 public class TelemetrySession
 {
@@ -42,6 +42,28 @@ public class TelemetryPoint
     public double BrakeTempFR { get; set; }
     public double BrakeTempRL { get; set; }
     public double BrakeTempRR { get; set; }
+    public double TyrePressFL { get; set; }
+    public double TyrePressFR { get; set; }
+    public double TyrePressRL { get; set; }
+    public double TyrePressRR { get; set; }
+        // Rim temperature
+    public double TyreRimFL { get; set; }
+    public double TyreRimFR { get; set; }
+    public double TyreRimRL { get; set; }
+    public double TyreRimRR { get; set; }
+    // Battistrada: inner / centre / outer (da TyresTempLeft/Centre/Right)
+    public double TyreInFL { get; set; }
+    public double TyreInFR { get; set; }
+    public double TyreInRL { get; set; }
+    public double TyreInRR { get; set; }
+    public double TyreCtFL { get; set; }
+    public double TyreCtFR { get; set; }
+    public double TyreCtRL { get; set; }
+    public double TyreCtRR { get; set; }
+    public double TyreOtFL { get; set; }
+    public double TyreOtFR { get; set; }
+    public double TyreOtRL { get; set; }
+    public double TyreOtRR { get; set; }
 }
 
 public class LapMarker
@@ -96,6 +118,26 @@ public class SavedPoint
     public double Bt2 { get; set; }
     public double Bt3 { get; set; }
     public double Bt4 { get; set; }
+    public double Tp1 { get; set; }
+    public double Tp2 { get; set; }
+    public double Tp3 { get; set; }
+    public double Tp4 { get; set; } 
+    public double Rt1 { get; set; }
+    public double Rt2 { get; set; }
+    public double Rt3 { get; set; }
+    public double Rt4 { get; set; }
+    public double Zi1 { get; set; }
+    public double Zi2 { get; set; }
+    public double Zi3 { get; set; }
+    public double Zi4 { get; set; }
+    public double Zc1 { get; set; }
+    public double Zc2 { get; set; }
+    public double Zc3 { get; set; }
+    public double Zc4 { get; set; }
+    public double Zo1 { get; set; }
+    public double Zo2 { get; set; }
+    public double Zo3 { get; set; }
+    public double Zo4 { get; set; }       
 }
 public class ComparisonEntry
 {

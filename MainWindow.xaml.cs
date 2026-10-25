@@ -7,10 +7,10 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Input;
 using Microsoft.Win32;
-using LmuTelemetryDesktop.Models;
-using LmuTelemetryDesktop.Services;
+using TraceEngineer.Models;
+using TraceEngineer.Services;
 
-namespace LmuTelemetryDesktop;
+namespace TraceEngineer;
 
 public partial class MainWindow : Window
 {
@@ -28,15 +28,195 @@ public partial class MainWindow : Window
 
     private double _plotW, _plotH, _xSpan;
     private bool _axisDistance;
+    private string _activeTab = "car";
     private Line? _cursorLine;
     private TextBlock? _cursorLabel;
     private double _cursorFrac = 0.0;
+
+    private sealed class HoverLane
+    {
+        public Lane Lane = null!;
+        public bool IsDelta;
+        public List<(double X, double Y)>? Delta;
+        public double TraceTop;
+        public double TraceH;
+        public double VMin;
+        public double VSpan;
+    }
+    
+    private sealed class HoverCompound
+    {
+        public int WheelIndex;
+        public double ATop, AH, AMin, ASpan;
+        public double BTop, BH, PMin, PSpan, WMin, WSpan;
+    }
+
+    private List<HoverLane> _hoverLanes = new();
+    private List<HoverCompound> _hoverCompound = new();
+    private List<ComparisonEntry> _hoverEntries = new();
+    private Func<TelemetryPoint, double> _hoverSelX = p => p.Time;
+    private bool _hoverCompare;
 
     private string _currentTrackName = "";
     private string _currentSessionDate = "";
     private bool _suppressSelectionEvents = false;
     
+    private static Func<TelemetryPoint, double> Carcass(int w) => w switch
+    { 0 => p => p.TyreTempFL, 1 => p => p.TyreTempFR, 2 => p => p.TyreTempRL, _ => p => p.TyreTempRR };
+    private static Func<TelemetryPoint, double> Inner(int w) => w switch
+    { 0 => p => p.TyreInFL, 1 => p => p.TyreInFR, 2 => p => p.TyreInRL, _ => p => p.TyreInRR };
+    private static Func<TelemetryPoint, double> Centre(int w) => w switch
+    { 0 => p => p.TyreCtFL, 1 => p => p.TyreCtFR, 2 => p => p.TyreCtRL, _ => p => p.TyreCtRR };
+    private static Func<TelemetryPoint, double> Outer(int w) => w switch
+    { 0 => p => p.TyreOtFL, 1 => p => p.TyreOtFR, 2 => p => p.TyreOtRL, _ => p => p.TyreOtRR };
+    private static Func<TelemetryPoint, double> Rim(int w) => w switch
+    { 0 => p => p.TyreRimFL, 1 => p => p.TyreRimFR, 2 => p => p.TyreRimRL, _ => p => p.TyreRimRR };
+    private static Func<TelemetryPoint, double> Press(int w) => w switch
+    { 0 => p => p.TyrePressFL, 1 => p => p.TyrePressFR, 2 => p => p.TyrePressRL, _ => p => p.TyrePressRR };
+    private static Func<TelemetryPoint, double> TWear(int w) => w switch
+    { 0 => p => p.TyreWearFL, 1 => p => p.TyreWearFR, 2 => p => p.TyreWearRL, _ => p => p.TyreWearRR };
 
+    private void DrawCompoundLane(int wi, List<ComparisonEntry> entries, bool compareMode,
+        double top, double laneH, double plotW,
+        Func<TelemetryPoint, double> selX, double xSpan)
+    {
+        string wname = WheelKey[wi].Name;
+
+        // ===== PANEL A: temperature (°C) =====
+        double aTop = top + 4, aH = Math.Max(6, laneH - 11);
+        var tempSeries = new List<(string N, Func<TelemetryPoint, double> S, Color C, double Th, bool Dash)>();
+        if (compareMode)
+        {
+            // solo carcass per giro
+        }
+        else
+        {
+            tempSeries.Add(("carcass", Carcass(wi), Color.FromRgb(255, 255, 255), 1.4, false));
+            tempSeries.Add(("inner",  Inner(wi),  Color.FromRgb(255, 82, 82),  1.0, false));
+            tempSeries.Add(("centre", Centre(wi), Color.FromRgb(255, 205, 60), 1.0, false));
+            tempSeries.Add(("outer",  Outer(wi),  Color.FromRgb(150, 255, 130),1.0, false));
+            tempSeries.Add(("rim",    Rim(wi),    Color.FromRgb(255, 145, 0),  1.0, true));
+        }
+
+        double aMin = double.MaxValue, aMax = double.MinValue;
+        if (compareMode)
+        {
+            foreach (var e in entries) foreach (var p in e.Points)
+            { double v = Carcass(wi)(p); if (v < aMin) aMin = v; if (v > aMax) aMax = v; }
+        }
+        else
+        {
+            foreach (var e in entries) foreach (var p in e.Points)
+                foreach (var s in tempSeries)
+                { double v = s.S(p); if (v < aMin) aMin = v; if (v > aMax) aMax = v; }
+        }
+        double aSpan = aMax - aMin;
+        if (aSpan < 1e-9) { aMin -= 0.5; aSpan = 1.0; }
+
+        if (compareMode)
+        {
+            for (int gi = 0; gi < entries.Count; gi++)
+            {
+                var poly = new Polyline
+                {
+                    Points = BuildTrace(entries[gi].Points, selX, Carcass(wi), 0, xSpan, aMin, aSpan, plotW, aH, 6000),
+                    Stroke = new SolidColorBrush(LapColors[gi]),
+                    StrokeThickness = 1.2,
+                    RenderTransform = new TranslateTransform(LeftPad, aTop)
+                };
+                ChartCanvas.Children.Add(poly);
+            }
+        }
+        else
+        {
+            foreach (var s in tempSeries)
+            {
+                var poly = new Polyline
+                {
+                    Points = BuildTrace(entries[0].Points, selX, s.S, 0, xSpan, aMin, aSpan, plotW, aH, 6000),
+                    Stroke = new SolidColorBrush(s.C),
+                    StrokeThickness = s.Th,
+                    StrokeDashArray = s.Dash ? new DoubleCollection { 4, 3 } : null,
+                    RenderTransform = new TranslateTransform(LeftPad, aTop)
+                };
+                ChartCanvas.Children.Add(poly);
+            }
+        }
+
+        // tick °C a sinistra
+        foreach (var tv in new[] { aMax, (aMax + aMin) / 2, aMin })
+        {
+            double ty = aTop + aH - ((tv - aMin) / aSpan) * aH;
+            var t = Label(tv.ToString("0"), 9, Color.FromRgb(150, 150, 155));
+            Canvas.SetLeft(t, LeftPad + 4);
+            Canvas.SetTop(t, ty - 6);
+            ChartCanvas.Children.Add(t);
+        }
+
+        var nameA = Label($"{wname} tyre — temp", 11, Color.FromRgb(200, 200, 206));
+        nameA.FontWeight = FontWeights.SemiBold;
+        Canvas.SetLeft(nameA, 5);
+        Canvas.SetTop(nameA, top + 3);
+        ChartCanvas.Children.Add(nameA);
+
+        // ===== PANEL B: pressure + wear =====
+        double bTop = top + laneH + 4, bH = Math.Max(6, laneH - 11);
+
+        double pMin = double.MaxValue, pMax = double.MinValue;
+        double wMin = double.MaxValue, wMax = double.MinValue;
+        foreach (var e in entries) foreach (var p in e.Points)
+        {
+            double pv = Press(wi)(p); if (pv < pMin) pMin = pv; if (pv > pMax) pMax = pv;
+            double wv = TWear(wi)(p); if (wv < wMin) wMin = wv; if (wv > wMax) wMax = wv;
+        }
+        double pSpan = pMax - pMin; if (pSpan < 1e-9) { pMin -= 0.5; pSpan = 1.0; }
+        double wSpan = wMax - wMin; if (wSpan < 1e-9) { wMin -= 0.05; wSpan = 0.1; }
+
+        for (int gi = 0; gi < entries.Count; gi++)
+        {
+            var colP = compareMode ? LapColors[gi] : Color.FromRgb(0, 214, 255);
+            var colW = compareMode ? LapColors[gi] : Color.FromRgb(255, 77, 210);
+            var polyP = new Polyline
+            {
+                Points = BuildTrace(entries[gi].Points, selX, Press(wi), 0, xSpan, pMin, pSpan, plotW, bH, 6000),
+                Stroke = new SolidColorBrush(colP),
+                StrokeThickness = 1.1,
+                RenderTransform = new TranslateTransform(LeftPad, bTop)
+            };
+            ChartCanvas.Children.Add(polyP);
+
+            var polyW = new Polyline
+            {
+                Points = BuildTrace(entries[gi].Points, selX, TWear(wi), 0, xSpan, wMin, wSpan, plotW, bH, 6000),
+                Stroke = new SolidColorBrush(colW),
+                StrokeThickness = 1.0,
+                StrokeDashArray = new DoubleCollection { 4, 3 },
+                RenderTransform = new TranslateTransform(LeftPad, bTop)
+            };
+            ChartCanvas.Children.Add(polyW);
+        }
+
+        // tick pressure a sinistra
+        foreach (var tv in new[] { pMax, (pMax + pMin) / 2, pMin })
+        {
+            double ty = bTop + bH - ((tv - pMin) / pSpan) * bH;
+            var t = Label(tv.ToString("0.#"), 9, Color.FromRgb(150, 150, 155));
+            Canvas.SetLeft(t, LeftPad + 4);
+            Canvas.SetTop(t, ty - 6);
+            ChartCanvas.Children.Add(t);
+        }
+
+        var nameB = Label($"{wname} tyre — press / wear", 10, Color.FromRgb(160, 160, 166));
+        Canvas.SetLeft(nameB, 5);
+        Canvas.SetTop(nameB, top + laneH + 3);
+        ChartCanvas.Children.Add(nameB);
+        _hoverCompound.Add(new HoverCompound
+        {
+            WheelIndex = wi,
+            ATop = aTop, AH = aH, AMin = aMin, ASpan = aSpan,
+            BTop = bTop, BH = bH, PMin = pMin, PSpan = pSpan, WMin = wMin, WSpan = wSpan
+        });        
+    }
     private static readonly Color[] LapColors =
     {
         Color.FromRgb(0, 255, 255),    // Giro 1: ciano
@@ -55,7 +235,7 @@ public partial class MainWindow : Window
         public Lane(string name, string unit, Func<TelemetryPoint, double> sel, Color color)
         { Name = name; Unit = unit; Sel = sel; Color = color; }
         public string Name { get; }
-        public string Unit { get; }
+        public string Unit { get; set; }
         public Func<TelemetryPoint, double> Sel { get; }
         public Color Color { get; }
         public List<WheelSeries>? Wheel { get; init; }
@@ -93,8 +273,8 @@ public partial class MainWindow : Window
     {
         var dlg = new OpenFileDialog
         {
-            Filter = "LMU Telemetry (*.duckdb;*.db)|*.duckdb;*.db|All Files (*.*)|*.*",
-            Title = "Select LMU Telemetry File"
+            Filter = "Telemetry (*.duckdb;*.db)|*.duckdb;*.db|All Files (*.*)|*.*",
+            Title = "Select Telemetry File"
         };
 
         if (dlg.ShowDialog() == true)
@@ -185,6 +365,7 @@ public partial class MainWindow : Window
             SessionHeader.Text = _currentTrackName != ""
                 ? $"{_currentTrackName}  •  {_currentSessionDate}"
                 : _currentSessionDate;
+            SessionHeader.Text += "   •   " + DetectCarName(_reader.ReadMetadata(_selectedFile ?? ""));
 
             BtnSaveLap.IsEnabled = _lapInfos.Count > 0;
             RefreshSavedList();
@@ -375,6 +556,9 @@ public partial class MainWindow : Window
     {
         if (ChartCanvas is null) return;
         ChartCanvas.Children.Clear();
+        _hoverLanes = new List<HoverLane>();
+        _hoverCompound = new List<HoverCompound>();
+        _hoverEntries = entries ?? new List<ComparisonEntry>();
 
         double W = ChartCanvas.ActualWidth;
         double H = ChartCanvas.ActualHeight;
@@ -393,34 +577,39 @@ public partial class MainWindow : Window
         
 
         var lanes = new List<Lane>();
-        if (ChkSpeed.IsChecked == true)
-            lanes.Add(new Lane("Speed", "km/h", p => p.Speed, Color.FromRgb(255, 255, 255)));
-        if (ChkThrottle.IsChecked == true)
-            lanes.Add(new Lane("Throttle", "%", p => p.Throttle * 100.0, Color.FromRgb(0, 214, 255)));
-        if (ChkBrake.IsChecked == true)
-            lanes.Add(new Lane("Brake", "%", p => p.Brake * 100.0, Color.FromRgb(255, 82, 82)));
-        if (ChkSteering.IsChecked == true)
-            lanes.Add(new Lane("Steering", "raw", p => p.Steering, Color.FromRgb(150, 255, 130)));
-        if (ChkRpm.IsChecked == true)
-            lanes.Add(new Lane("Engine RPM", "rpm", p => p.RPM, Color.FromRgb(255, 205, 60)));
-        if (ChkSoC.IsChecked == true)
-            lanes.Add(new Lane("SoC", "%", p => p.SoC, Color.FromRgb(186, 104, 255)));
-        if (ChkErs.IsChecked == true)
-            lanes.Add(new Lane("ERS power", "%/s", p => p.ErsPower, Color.FromRgb(0, 230, 118)));
-        if (ChkTyreTemp.IsChecked == true)
-            lanes.Add(WheelLane("Tyre temp (carcass)", "°C",
-                p => p.TyreTempFL, p => p.TyreTempFR, p => p.TyreTempRL, p => p.TyreTempRR));
-        if (ChkTyreWear.IsChecked == true)
-            lanes.Add(WheelLane("Tyre wear", "",
-                p => p.TyreWearFL, p => p.TyreWearFR, p => p.TyreWearRL, p => p.TyreWearRR));
-        if (ChkBrakeTemp.IsChecked == true)
+        var compoundWheels = new List<int>();
+
+        if (_activeTab == "car")
+        {
+            if (ChkSpeed.IsChecked == true)
+                lanes.Add(new Lane("Speed", "km/h", p => p.Speed, Color.FromRgb(255, 255, 255)));
+            if (ChkThrottle.IsChecked == true)
+                lanes.Add(new Lane("Throttle", "%", p => p.Throttle * 100.0, Color.FromRgb(0, 214, 255)));
+            if (ChkBrake.IsChecked == true)
+                lanes.Add(new Lane("Brake", "%", p => p.Brake * 100.0, Color.FromRgb(255, 82, 82)));
+            if (ChkSteering.IsChecked == true)
+                lanes.Add(new Lane("Steering", "raw", p => p.Steering, Color.FromRgb(150, 255, 130)));
+            if (ChkRpm.IsChecked == true)
+                lanes.Add(new Lane("Engine RPM", "rpm", p => p.RPM, Color.FromRgb(255, 205, 60)));
+            if (ChkSoC.IsChecked == true)
+                lanes.Add(new Lane("SoC", "%", p => p.SoC, Color.FromRgb(186, 104, 255)));
+            if (ChkErs.IsChecked == true)
+                lanes.Add(new Lane("ERS power", "%/s", p => p.ErsPower, Color.FromRgb(0, 230, 118)));
+        }
+        else if (_activeTab == "tyres")
+        {
+            compoundWheels = new List<int> { 0, 1, 2, 3 };
+        }
+        else // brakes
+        {
             lanes.Add(WheelLane("Brake temp", "°C",
                 p => p.BrakeTempFL, p => p.BrakeTempFR, p => p.BrakeTempRL, p => p.BrakeTempRR));
-        if (ChkBrakeWear.IsChecked == true)
             lanes.Add(WheelLane("Brake wear", "mm",
                 p => p.BrakeWearFL, p => p.BrakeWearFR, p => p.BrakeWearRL, p => p.BrakeWearRR));
+        }
 
-        if (lanes.Count == 0)
+
+        if (lanes.Count == 0 && compoundWheels.Count == 0)
         {
             Center(W, H, "Select at least one channel", 14, "#FFFFFF");
             return;
@@ -439,12 +628,14 @@ public partial class MainWindow : Window
         double plotH = H - TopPad - BottomPad;
         if (plotW < 30 || plotH < 30) return;
 
-        int totalLanes = lanes.Count + (showDelta ? 1 : 0);
+        int totalLanes = lanes.Count + 2 * compoundWheels.Count + (showDelta ? 1 : 0);
         double laneH = plotH / totalLanes;
         int laneOffset = showDelta ? 1 : 0;   // il delta occupa la corsia 0
 
         // Asse X comune (tempo o distanza)
         Func<TelemetryPoint, double> selX = useDistance ? (p => p.Distance) : (p => p.Time);
+        _hoverSelX = selX;
+        _hoverCompare = compareMode;
         double xMax = 0;
         foreach (var e in entries)
         {
@@ -503,6 +694,15 @@ public partial class MainWindow : Window
             dMax = Math.Max(dMax, 0);
             double dSpan = dMax - dMin;
             if (dSpan < 1e-9) { dMin -= 0.5; dSpan = 1.0; }
+            _hoverLanes.Add(new HoverLane
+            {
+                IsDelta = true,
+                Delta = deltaData,
+                TraceTop = traceTop,
+                TraceH = traceH,
+                VMin = dMin,
+                VSpan = dSpan
+            });
 
             // linea dello zero
             double zeroY = traceTop + traceH - ((0 - dMin) / dSpan) * traceH;
@@ -573,6 +773,19 @@ public partial class MainWindow : Window
             }
             double vSpan = vMax - vMin;
             if (vSpan < 1e-9) { vMin -= 0.5; vSpan = 1.0; }
+            // Unità rilevata dall'ordine di grandezza dei valori loggati
+            if (lane.Name == "Tyre pressure")
+            {
+                lane.Unit = vMax < 10 ? "bar" : (vMax < 100 ? "psi" : "kPa");
+            }
+            _hoverLanes.Add(new HoverLane
+            {
+                Lane = lane,
+                TraceTop = traceTop,
+                TraceH = traceH,
+                VMin = vMin,
+                VSpan = vSpan
+            });
 
             if (lane.Wheel != null)
             {
@@ -657,6 +870,15 @@ public partial class MainWindow : Window
             Canvas.SetLeft(unit, 5);
             Canvas.SetTop(unit, laneTop + 18);
             ChartCanvas.Children.Add(unit);
+        }
+
+        // ---- COMPOUND LANES (una per ruota) ----
+        int slotStart = laneOffset + lanes.Count;
+        for (int j = 0; j < compoundWheels.Count; j++)
+        {
+            double top = TopPad + (slotStart + 2 * j) * laneH;
+            DrawCompoundLane(compoundWheels[j], entries, compareMode, top, laneH,
+                            plotW, selX, xSpan);
         }
 
         // ---- LEGENDA ----
@@ -900,6 +1122,8 @@ public partial class MainWindow : Window
                 ErsPower = p.ErsPower,
                 TyreTempFL = p.TyreTempFL, TyreTempFR = p.TyreTempFR,
                 TyreTempRL = p.TyreTempRL, TyreTempRR = p.TyreTempRR,
+                TyrePressFL = p.TyrePressFL, TyrePressFR = p.TyrePressFR,
+                TyrePressRL = p.TyrePressRL, TyrePressRR = p.TyrePressRR,
                 TyreWearFL = p.TyreWearFL, TyreWearFR = p.TyreWearFR,
                 TyreWearRL = p.TyreWearRL, TyreWearRR = p.TyreWearRR,
                 BrakeWearFL = p.BrakeWearFL, BrakeWearFR = p.BrakeWearFR,
@@ -1034,6 +1258,10 @@ public partial class MainWindow : Window
                 Tt2 = p.TyreTempFR, 
                 Tt3 = p.TyreTempRL, 
                 Tt4 = p.TyreTempRR,
+                Tp1 = p.TyrePressFL,
+                Tp2 = p.TyrePressFR, 
+                Tp3 = p.TyrePressRL, 
+                Tp4 = p.TyrePressRR,
                 Tw1 = p.TyreWearFL, 
                 Tw2 = p.TyreWearFR, 
                 Tw3 = p.TyreWearRL, 
@@ -1046,6 +1274,10 @@ public partial class MainWindow : Window
                 Bw2 = p.BrakeWearFR, 
                 Bw3 = p.BrakeWearRL, 
                 Bw4 = p.BrakeWearRR,
+                Rt1 = p.TyreRimFL, Rt2 = p.TyreRimFR, Rt3 = p.TyreRimRL, Rt4 = p.TyreRimRR,
+                Zi1 = p.TyreInFL, Zi2 = p.TyreInFR, Zi3 = p.TyreInRL, Zi4 = p.TyreInRR,
+                Zc1 = p.TyreCtFL, Zc2 = p.TyreCtFR, Zc3 = p.TyreCtRL, Zc4 = p.TyreCtRR,
+                Zo1 = p.TyreOtFL, Zo2 = p.TyreOtFR, Zo3 = p.TyreOtRL, Zo4 = p.TyreOtRR,                
             });
         }
 
@@ -1064,6 +1296,10 @@ public partial class MainWindow : Window
                 Tt2 = last.TyreTempFR, 
                 Tt3 = last.TyreTempRL, 
                 Tt4 = last.TyreTempRR,
+                Tp1 = last.TyrePressFL,
+                Tp2 = last.TyrePressFR, 
+                Tp3 = last.TyrePressRL, 
+                Tp4 = last.TyrePressRR,
                 Tw1 = last.TyreWearFL, 
                 Tw2 = last.TyreWearFR, 
                 Tw3 = last.TyreWearRL, 
@@ -1076,6 +1312,10 @@ public partial class MainWindow : Window
                 Bw2 = last.BrakeWearFR, 
                 Bw3 = last.BrakeWearRL, 
                 Bw4 = last.BrakeWearRR, 
+                Rt1 = last.TyreRimFL, Rt2 = last.TyreRimFR, Rt3 = last.TyreRimRL, Rt4 = last.TyreRimRR,
+                Zi1 = last.TyreInFL, Zi2 = last.TyreInFR, Zi3 = last.TyreInRL, Zi4 = last.TyreInRR,
+                Zc1 = last.TyreCtFL, Zc2 = last.TyreCtFR, Zc3 = last.TyreCtRL, Zc4 = last.TyreCtRR,
+                Zo1 = last.TyreOtFL, Zo2 = last.TyreOtFR, Zo3 = last.TyreOtRL, Zo4 = last.TyreOtRR,
             });
 
         return result;
@@ -1216,6 +1456,15 @@ public partial class MainWindow : Window
 
     private void Axis_Click(object sender, RoutedEventArgs e) => ApplyComparisonState();
 
+    private void Tab_Click(object sender, RoutedEventArgs e)
+    {
+        _activeTab = RbTabCar.IsChecked == true ? "car"
+                   : RbTabTyres.IsChecked == true ? "tyres"
+                   : "brakes";
+        OptionsPanel.Visibility = _activeTab == "car" ? Visibility.Visible : Visibility.Collapsed;
+        ApplyComparisonState();
+    }    
+
     private void RefreshSavedList()
     {
         _savedLaps = _store.LoadAll();   // lista completa (serve per il lookup in UpdateComparison)
@@ -1267,7 +1516,7 @@ public partial class MainWindow : Window
             var c = CultureInfo.CurrentCulture;
             var sb = new StringBuilder(1 << 20);
 
-            sb.AppendLine("Time_s;Speed_kmh;Throttle_pct;Brake_pct;Steering;RPM;SoC_pct;ERS_pct_s;TyreTemp_FL;TyreTemp_FR;TyreTemp_RL;TyreTemp_RR;TyreWear_FL;TyreWear_FR;TyreWear_RL;TyreWear_RR;BrakeTemp_FL;BrakeTemp_FR;BrakeTemp_RL;BrakeTemp_RR;BrakeWear_FL;BrakeWear_FR;BrakeWear_RL;BrakeWear_RR");
+            sb.AppendLine("Time_s;Speed_kmh;Throttle_pct;Brake_pct;Steering;RPM;SoC_pct;ERS_pct_s;TyreTemp_FL;TyreTemp_FR;TyreTemp_RL;TyreTemp_RR;TyrePress_FL;TyrePress_FR;TyrePress_RL;TyrePress_RR;TyreWear_FL;TyreWear_FR;TyreWear_RL;TyreWear_RR;BrakeTemp_FL;BrakeTemp_FR;BrakeTemp_RL;BrakeTemp_RR;BrakeWear_FL;BrakeWear_FR;BrakeWear_RL;BrakeWear_RR;TyreRim_FL;TyreRim_FR;TyreRim_RL;TyreRim_RR;TyreIn_FL;TyreIn_FR;TyreIn_RL;TyreIn_RR;TyreCt_FL;TyreCt_FR;TyreCt_RL;TyreCt_RR;TyreOt_FL;TyreOt_FR;TyreOt_RL;TyreOt_RR");
 
             int lapIdx = 0;
             foreach (var p in _allPoints)
@@ -1299,7 +1548,23 @@ public partial class MainWindow : Window
                   .Append((p.BrakeWearFL * 100).ToString("0.##", c)).Append(';')
                   .Append((p.BrakeWearFR * 100).ToString("0.##", c)).Append(';')
                   .Append((p.BrakeWearRL * 100).ToString("0.##", c)).Append(';')
-                  .Append((p.BrakeWearRR * 100).ToString("0.##", c)).Append('\n');
+                  .Append(p.TyrePressRR.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreRimFL.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreRimFR.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreRimRL.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreRimRR.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreInFL.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreInFR.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreInRL.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreInRR.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreCtFL.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreCtFR.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreCtRL.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreCtRR.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreOtFL.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreOtFR.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreOtRL.ToString("0.##", c)).Append(';')
+                  .Append(p.TyreOtRR.ToString("0.##", c)).AppendLine();
             }
 
             File.WriteAllText(dlg.FileName, sb.ToString(), Encoding.UTF8);
@@ -1419,12 +1684,18 @@ public partial class MainWindow : Window
                         ErsPower = p.ErsPower,
                         TyreTempFL = p.TyreTempFL, TyreTempFR = p.TyreTempFR,
                         TyreTempRL = p.TyreTempRL, TyreTempRR = p.TyreTempRR,
+                        TyrePressFL = p.TyrePressFL, TyrePressFR = p.TyrePressFR,
+                        TyrePressRL = p.TyrePressRL, TyrePressRR = p.TyrePressRR,
                         TyreWearFL = p.TyreWearFL, TyreWearFR = p.TyreWearFR,
                         TyreWearRL = p.TyreWearRL, TyreWearRR = p.TyreWearRR,
                         BrakeTempFL = p.BrakeTempFL, BrakeTempFR = p.BrakeTempFR,
                         BrakeTempRL = p.BrakeTempRL, BrakeTempRR = p.BrakeTempRR,
                         BrakeWearFL = p.BrakeWearFL, BrakeWearFR = p.BrakeWearFR,
-                        BrakeWearRL = p.BrakeWearRL, BrakeWearRR = p.BrakeWearRR
+                        BrakeWearRL = p.BrakeWearRL, BrakeWearRR = p.BrakeWearRR,
+                        TyreRimFL = p.TyreRimFL, TyreRimFR = p.TyreRimFR, TyreRimRL = p.TyreRimRL, TyreRimRR = p.TyreRimRR,
+                        TyreInFL = p.TyreInFL, TyreInFR = p.TyreInFR, TyreInRL = p.TyreInRL, TyreInRR = p.TyreInRR,
+                        TyreCtFL = p.TyreCtFL, TyreCtFR = p.TyreCtFR, TyreCtRL = p.TyreCtRL, TyreCtRR = p.TyreCtRR,
+                        TyreOtFL = p.TyreOtFL, TyreOtFR = p.TyreOtFR, TyreOtRL = p.TyreOtRL, TyreOtRR = p.TyreOtRR
                     }).ToList();
 
                 ComputeDistance(pts);
@@ -1455,10 +1726,15 @@ public partial class MainWindow : Window
                     Steering = sp.St, RPM = sp.R,
                     SoC = sp.SoC,
                     ErsPower = sp.Ers,
+                    TyrePressFL = sp.Tp1, TyrePressFR = sp.Tp2, TyrePressRL = sp.Tp3, TyrePressRR = sp.Tp4,
                     TyreTempFL = sp.Tt1, TyreTempFR = sp.Tt2, TyreTempRL = sp.Tt3, TyreTempRR = sp.Tt4,
                     TyreWearFL = sp.Tw1, TyreWearFR = sp.Tw2, TyreWearRL = sp.Tw3, TyreWearRR = sp.Tw4,
                     BrakeTempFL = sp.Bt1, BrakeTempFR = sp.Bt2, BrakeTempRL = sp.Bt3, BrakeTempRR = sp.Bt4,
                     BrakeWearFL = sp.Bw1, BrakeWearFR = sp.Bw2, BrakeWearRL = sp.Bw3, BrakeWearRR = sp.Bw4,
+                    TyreRimFL = sp.Rt1, TyreRimFR = sp.Rt2, TyreRimRL = sp.Rt3, TyreRimRR = sp.Rt4,
+                    TyreInFL = sp.Zi1, TyreInFR = sp.Zi2, TyreInRL = sp.Zi3, TyreInRR = sp.Zi4,
+                    TyreCtFL = sp.Zc1, TyreCtFR = sp.Zc2, TyreCtRL = sp.Zc3, TyreCtRR = sp.Zc4,
+                    TyreOtFL = sp.Zo1, TyreOtFR = sp.Zo2, TyreOtRL = sp.Zo3, TyreOtRR = sp.Zo4
                 }).ToList();
 
                 ComputeDistance(ptsSaved);
@@ -1488,9 +1764,210 @@ public partial class MainWindow : Window
     {
         ChkSoC.IsEnabled       = _reader.AvailableChannels.Contains("SoC");
         ChkErs.IsEnabled       = _reader.AvailableChannels.Contains("ERS");
-        ChkTyreTemp.IsEnabled  = _reader.AvailableChannels.Contains("TyreTemp");
-        ChkTyreWear.IsEnabled  = _reader.AvailableChannels.Contains("TyreWear");
-        ChkBrakeTemp.IsEnabled = _reader.AvailableChannels.Contains("BrakeTemp");
-        ChkBrakeWear.IsEnabled = _reader.AvailableChannels.Contains("BrakeWear");
+        bool tyreAvail = _reader.AvailableChannels.Contains("TyrePress")
+                    || _reader.AvailableChannels.Contains("TyreZones")
+                    || _reader.AvailableChannels.Contains("TyreRim");
+        RbTabTyres.IsEnabled = tyreAvail;
+
+        bool brakeAvail = _reader.AvailableChannels.Contains("BrakeTemp")
+                    || _reader.AvailableChannels.Contains("BrakeWear");
+        RbTabBrakes.IsEnabled = brakeAvail;
+    }
+
+    private void ChartCanvas_MouseLeave(object sender, MouseEventArgs e) => HideHover();
+
+    private void HideHover()
+    {
+        HoverTip.Visibility = Visibility.Collapsed;
+        HoverDot.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowHover(double x, double y, Color col, string text)
+    {
+        HoverDot.Visibility = Visibility.Visible;
+        HoverDot.Fill = new SolidColorBrush(col);
+        HoverDot.Margin = new Thickness(x - 3.5, y - 3.5, 0, 0);
+
+        HoverTipText.Text = text;
+        HoverTip.Visibility = Visibility.Visible;
+        double tipX = Math.Min(x + 12, Math.Max(0, ChartCanvas.ActualWidth - 180));
+        double tipY = Math.Max(4, y - 46);
+        HoverTip.Margin = new Thickness(tipX, tipY, 0, 0);
+    }
+
+    private static int IndexAtX(List<TelemetryPoint> pts, Func<TelemetryPoint, double> selX, double x)
+    {
+        if (pts.Count == 0) return -1;
+        int lo = 0, hi = pts.Count - 1;
+        if (x <= selX(pts[lo])) return lo;
+        if (x >= selX(pts[hi])) return hi;
+        while (hi - lo > 1)
+        {
+            int mid = (lo + hi) / 2;
+            if (selX(pts[mid]) < x) lo = mid; else hi = mid;
+        }
+        return (x - selX(pts[lo]) < selX(pts[hi]) - x) ? lo : hi;
+    }
+
+    private static int IndexAtDeltaX(List<(double X, double Y)> data, double x)
+    {
+        int lo = 0, hi = data.Count - 1;
+        if (x <= data[lo].X) return lo;
+        if (x >= data[hi].X) return hi;
+        while (hi - lo > 1)
+        {
+            int mid = (lo + hi) / 2;
+            if (data[mid].X < x) lo = mid; else hi = mid;
+        }
+        return (x - data[lo].X < data[hi].X - x) ? lo : hi;
+    }
+
+    private void ChartCanvas_MouseMove(object sender, MouseEventArgs e)
+    {
+        if ((_hoverLanes.Count == 0 && _hoverCompound.Count == 0) || _hoverEntries.Count == 0 || _plotW <= 0)
+        { HideHover(); return; }
+
+        var pos = e.GetPosition(ChartCanvas);
+
+        HoverLane? hi = null;
+        foreach (var h in _hoverLanes)
+            if (pos.Y >= h.TraceTop - 3 && pos.Y <= h.TraceTop + h.TraceH + 3) { hi = h; break; }
+
+        if (hi == null)
+        {
+            HoverCompound? hc = null;
+            bool inA = false;
+            foreach (var c in _hoverCompound)
+            {
+                if (pos.Y >= c.ATop - 3 && pos.Y <= c.ATop + c.AH + 3) { hc = c; inA = true; break; }
+                if (pos.Y >= c.BTop - 3 && pos.Y <= c.BTop + c.BH + 3) { hc = c; inA = false; break; }
+            }
+            if (hc == null) { HideHover(); return; }
+
+            double cfrac = (pos.X - LeftPad) / _plotW;
+            if (cfrac < 0 || cfrac > 1) { HideHover(); return; }
+            double cxVal = cfrac * _xSpan;
+
+            int wi = hc.WheelIndex;
+            double cDist = double.MaxValue;
+            string cText = "";
+            double cX = 0, cY = 0;
+            var cCol = Colors.White;
+
+            for (int gi = 0; gi < _hoverEntries.Count; gi++)
+            {
+                var entry = _hoverEntries[gi];
+                int idx = IndexAtX(entry.Points, _hoverSelX, cxVal);
+                if (idx < 0) continue;
+                var p = entry.Points[idx];
+                double px = LeftPad + (_hoverSelX(p) / _xSpan) * _plotW;
+
+                var candidates = new List<(string N, Func<TelemetryPoint, double> S, Color C)>();
+                if (inA)
+                {
+                    if (_hoverCompare)
+                        candidates.Add(("carcass", Carcass(wi), LapColors[gi]));
+                    else
+                    {
+                        candidates.Add(("carcass", Carcass(wi), Color.FromRgb(255, 255, 255)));
+                        candidates.Add(("inner", Inner(wi), Color.FromRgb(255, 82, 82)));
+                        candidates.Add(("centre", Centre(wi), Color.FromRgb(255, 205, 60)));
+                        candidates.Add(("outer", Outer(wi), Color.FromRgb(150, 255, 130)));
+                        candidates.Add(("rim", Rim(wi), Color.FromRgb(255, 145, 0)));
+                    }
+                }
+                else
+                {
+                    candidates.Add(("pressure", Press(wi), _hoverCompare ? LapColors[gi] : Color.FromRgb(0, 214, 255)));
+                    candidates.Add(("wear", TWear(wi), _hoverCompare ? LapColors[gi] : Color.FromRgb(255, 77, 210)));
+                }
+
+                foreach (var cd in candidates)
+                {
+                    double v = cd.S(p);
+                    double py = inA
+                        ? hc.ATop + hc.AH - ((v - hc.AMin) / hc.ASpan) * hc.AH
+                        : (cd.N == "pressure"
+                            ? hc.BTop + hc.BH - ((v - hc.PMin) / hc.PSpan) * hc.BH
+                            : hc.BTop + hc.BH - ((v - hc.WMin) / hc.WSpan) * hc.BH);
+                    double d = Math.Abs(py - pos.Y);
+                    if (d < cDist)
+                    {
+                        cDist = d; cX = px; cY = py; cCol = cd.C;
+                        string lapTag = _hoverCompare ? entry.Label + "  " : "";
+                        string xTxt = _axisDistance ? $"{_hoverSelX(p):F0} m" : $"{_hoverSelX(p):F2} s";
+                        string vTxt = inA ? $"{v:F1} °C" : $"{v:F2}";
+                        cText = $"{lapTag}{WheelKey[wi].Name} {cd.N}\n{xTxt}    {vTxt}";
+                    }
+                }
+            }
+
+            if (cDist > 12) { HideHover(); return; }
+            ShowHover(cX, cY, cCol, cText);
+            return;
+        }
+
+        double frac = (pos.X - LeftPad) / _plotW;
+        if (frac < 0 || frac > 1) { HideHover(); return; }
+        double xVal = frac * _xSpan;
+
+        if (hi.IsDelta && hi.Delta != null && hi.Delta.Count > 1)
+        {
+            int di = IndexAtDeltaX(hi.Delta, xVal);
+            var (dx, dy) = hi.Delta[di];
+            double px = LeftPad + (dx / _xSpan) * _plotW;
+            double py = hi.TraceTop + hi.TraceH - ((dy - hi.VMin) / hi.VSpan) * hi.TraceH;
+            if (Math.Abs(py - pos.Y) > 12) { HideHover(); return; }
+
+            string xTxt = _axisDistance ? $"{dx:F0} m" : $"{dx:F2} s";
+            string sign = dy >= 0 ? "+" : "";
+            ShowHover(px, py, Color.FromRgb(255, 77, 210),
+                      $"Δ Time (lap2 − lap1)\n{xTxt}    {sign}{dy:F3} s");
+            return;
+        }
+
+        double bestDist = double.MaxValue;
+        string bestText = "";
+        double bestX = 0, bestY = 0;
+        var bestCol = Colors.White;
+
+        for (int gi = 0; gi < _hoverEntries.Count; gi++)
+        {
+            var entry = _hoverEntries[gi];
+            int idx = IndexAtX(entry.Points, _hoverSelX, xVal);
+            if (idx < 0) continue;
+            var p = entry.Points[idx];
+            double px = LeftPad + (_hoverSelX(p) / _xSpan) * _plotW;
+
+            int seriesCount = hi.Lane.Wheel != null ? hi.Lane.Wheel.Count : 1;
+            for (int w = 0; w < seriesCount; w++)
+            {
+                Func<TelemetryPoint, double> sel = hi.Lane.Wheel != null ? hi.Lane.Wheel[w].Sel : hi.Lane.Sel;
+                string sname = hi.Lane.Wheel != null ? hi.Lane.Wheel[w].Name : "";
+                Color col = _hoverCompare
+                    ? LapColors[gi]
+                    : (hi.Lane.Wheel != null ? WheelKey[w].Color : hi.Lane.Color);
+
+                double v = sel(p);
+                double py = hi.TraceTop + hi.TraceH - ((v - hi.VMin) / hi.VSpan) * hi.TraceH;
+                double d = Math.Abs(py - pos.Y);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    bestX = px;
+                    bestY = py;
+                    bestCol = col;
+                    string lapTag = _hoverCompare ? entry.Label + "  " : "";
+                    string wheelTag = sname.Length > 0 ? sname + "  " : "";
+                    string xTxt = _axisDistance ? $"{_hoverSelX(p):F0} m" : $"{_hoverSelX(p):F2} s";
+                    string vTxt = hi.Lane.Unit.Length > 0 ? $"{v:F1} {hi.Lane.Unit}" : $"{v:F3}";
+                    bestText = $"{lapTag}{wheelTag}{hi.Lane.Name}\n{xTxt}    {vTxt}";
+                }
+            }
+        }
+
+        if (bestDist > 12) { HideHover(); return; }
+
+        ShowHover(bestX, bestY, bestCol, bestText);
     }
 }

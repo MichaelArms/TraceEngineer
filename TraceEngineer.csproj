@@ -6,6 +6,8 @@
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>TraceEngineer</RootNamespace>
+    <AssemblyName>TraceEngineer</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

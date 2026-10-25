@@ -1,8 +1,8 @@
 using System.IO;
 using DuckDB.NET.Data;
-using LmuTelemetryDesktop.Models;
+using TraceEngineer.Models;
 
-namespace LmuTelemetryDesktop.Services;
+namespace TraceEngineer.Services;
 
 public class DuckDbTelemetryReader
 {
@@ -303,7 +303,7 @@ public class DuckDbTelemetryReader
             }
         }
 
-       var bt = ReadWheelTable(connStr, "Brakes Temp", n);
+        var bt = ReadWheelTable(connStr, "Brakes Temp", n);
         if (bt != null)
         {
             bool dyn = false;
@@ -327,7 +327,44 @@ public class DuckDbTelemetryReader
             
         }
 
+        var tp = ReadWheelTable(connStr, "TyresPressure", n);
+        if (tp != null)
+        {
+            AvailableChannels.Add("TyrePress");
+            for (int i = 0; i < n; i++)
+            {
+                points[i].TyrePressFL = tp[0][i]; points[i].TyrePressFR = tp[1][i];
+                points[i].TyrePressRL = tp[2][i]; points[i].TyrePressRR = tp[3][i];
+            }
+        } 
 
+        var rim = ReadWheelTable(connStr, "TyresRimTemp", n);
+        if (rim != null)
+        {
+            AvailableChannels.Add("TyreRim");
+            for (int i = 0; i < n; i++)
+            {
+                points[i].TyreRimFL = rim[0][i]; points[i].TyreRimFR = rim[1][i];
+                points[i].TyreRimRL = rim[2][i]; points[i].TyreRimRR = rim[3][i];
+            }
+        }
+
+        var zIn = ReadWheelTable(connStr, "TyresTempLeft", n);
+        var zCt = ReadWheelTable(connStr, "TyresTempCentre", n);
+        var zOt = ReadWheelTable(connStr, "TyresTempRight", n);
+        if (zIn != null && zCt != null && zOt != null)
+        {
+            AvailableChannels.Add("TyreZones");
+            for (int i = 0; i < n; i++)
+            {
+                points[i].TyreInFL = zIn[0][i]; points[i].TyreInFR = zIn[1][i];
+                points[i].TyreInRL = zIn[2][i]; points[i].TyreInRR = zIn[3][i];
+                points[i].TyreCtFL = zCt[0][i]; points[i].TyreCtFR = zCt[1][i];
+                points[i].TyreCtRL = zCt[2][i]; points[i].TyreCtRR = zCt[3][i];
+                points[i].TyreOtFL = zOt[0][i]; points[i].TyreOtFR = zOt[1][i];
+                points[i].TyreOtRL = zOt[2][i]; points[i].TyreOtRR = zOt[3][i];
+            }
+        } 
 
     }
 }

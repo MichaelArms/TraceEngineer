@@ -24,3 +24,6 @@ Thumbs.db
 *.csv
 lmu_debug.txt
 SavedLaps/
+
+docs/classes_architecture.png
+docs/general_architecture.png

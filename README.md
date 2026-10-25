@@ -1,16 +1,16 @@
-# LMU Telemetry Analyzer
+# TraceEngineer
 
-Unofficial desktop telemetry analysis tool for **Le Mans Ultimate** (Studio 397).
+Desktop telemetry analysis tool for sim racing.
 
-It reads the DuckDB telemetry logs produced by the game, renders lap-by-lap
-channel traces in MoTeC-style lanes, lets you build a personal library of
-reference laps, and compares laps across sessions and cars (e.g. LMH vs LMDh)
-on the same track — either against time or against distance, with automatic
+It reads DuckDB telemetry logs (as produced by Le Mans Ultimate and other
+simulators), renders lap-by-lap channel traces in MoTeC-style lanes, lets you
+build a personal library of reference laps, and compares laps across
+sessions and cars — either against time or against distance, with automatic
 time-delta computation.
 
 > ⚠️ **Disclaimer:** this is an unofficial, community-made tool.
-> It is not affiliated with, endorsed by, or supported by Studio 397 or the
-> Le Mans Ultimate development team. Use at your own risk.
+> It is not affiliated with, endorsed by, or supported by any game developer.
+> Use at your own risk.
 
 ## Features
 
@@ -106,7 +106,7 @@ See the [docs folder](docs/) for the full documentation:
 
 Go to [Releases](https://github.com/MichaelArms/LMUTelemetry/releases), download
 the latest `LMUTelemetry-v0.4.0-win-x64.zip`, extract it anywhere and run
-`LmuTelemetryDesktop.exe`. The build is self-contained: no .NET installation
+`TraceEngineer.exe`. The build is self-contained: no .NET installation
 required.
 
 ## Build from source

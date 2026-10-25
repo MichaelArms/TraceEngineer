@@ -2,9 +2,9 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Globalization;
-using LmuTelemetryDesktop.Models;
+using TraceEngineer.Models;
 
-namespace LmuTelemetryDesktop.Services;
+namespace TraceEngineer.Services;
 
 public class SavedLapStore
 {
@@ -15,11 +15,23 @@ public class SavedLapStore
 
     public static string SaveDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                     "LmuTelemetry", "SavedLaps");
+                     "TraceEngineer", "SavedLaps");
 
     public SavedLapStore()
     {
-        Directory.CreateDirectory(SaveDirectory);
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var newDir = Path.Combine(appData, "TraceEngineer", "SavedLaps");
+        var legacyDir = Path.Combine(appData, "LmuTelemetry", "SavedLaps");
+
+        // Migrazione automatica al primo avvio: sposta i giri salvati dalla
+        // vecchia cartella alla nuova, solo se la nuova non esiste ancora.
+        if (Directory.Exists(legacyDir) && !Directory.Exists(newDir))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(newDir)!);
+            Directory.Move(legacyDir, newDir);
+        }
+
+        Directory.CreateDirectory(newDir);
     }
 
     public string Save(SavedLap lap)

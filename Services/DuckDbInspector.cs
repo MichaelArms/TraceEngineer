@@ -1,6 +1,6 @@
 using DuckDB.NET.Data;
 
-namespace LmuTelemetryDesktop.Services;
+namespace TraceEngineer.Services;
 
 public class DuckDbInspector
 {
