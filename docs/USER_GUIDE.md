@@ -22,9 +22,10 @@
 - The colored bars are the only selection indicator: what you see barred is
   exactly what is being compared.
 
-## The three tabs
+## The four tabs
 
-The chart area is organized in three tabs, each focused on one subsystem:
+The chart area is organized in four tabs, each focused on one subsystem or
+analysis mode:
 
 ### Car tab (default)
 Vehicle dynamics and powertrain channels:
@@ -53,6 +54,12 @@ In comparison mode (2 laps) the top panel shows carcass for both laps
 Tabs that have no data in the current session are automatically disabled
 (greyed out).
 
+### Stint tab
+Lap-by-lap analysis across the entire session, with one lane per metric
+(Lap time, Tyre temp, Tyre pressure, Tyre wear, SoC, Brake temp, Speed).
+See the dedicated [Stint Analysis](#stint-analysis-stint-tab) section below
+for full details on metrics, filters and use cases.
+
 ## Vertical cursor
 
 A slider below the chart controls a vertical cursor line:
@@ -72,6 +79,26 @@ Move the mouse over any trace to read the exact value at that point:
   (e.g. `FL inner`, `RR pressure`)
 - On the Δ Time lane the probe shows the signed gap (e.g. `+0.142 s`)
 - Moving away from traces hides the probe
+
+## Track Map
+
+When a session with GPS data is loaded, a small track map appears in the top-right corner of the window. The map shows:
+
+- **Track profile**: a polyline representing one complete lap, reconstructed from GPS coordinates
+- **Start/Finish marker**: a white dot at the start of the lap
+- **Lap position dots**: colored dots (one per compared lap) that move along the track in sync with the cursor slider
+
+### How it works
+
+The app automatically detects GPS tables in the DuckDB file. For Le Mans Ultimate, it reads `GPS Latitude` and `GPS Longitude` tables and applies a `cos(latitude)` correction to make X/Y proportional to metres.
+
+The track profile is built from the longest complete lap in the session (excluding out-laps and pit laps). When comparing saved laps (which don't have GPS), the app uses the session lap profile as a fallback and positions the dots based on distance fraction.
+
+### Use cases
+
+- **Corner analysis**: drag the cursor to a specific corner and see where each lap is on the circuit
+- **Sector comparison**: compare two laps and watch the dots diverge in sectors where one driver is faster
+- **Pit stop detection**: in stint analysis, the dot will disappear during pit laps (if they're filtered out)
 
 ## Time vs Distance axis
 
@@ -106,13 +133,80 @@ Move the mouse over any trace to read the exact value at that point:
 2. Click **Delete selected lap** and confirm. The JSON file is permanently
    removed.
 
-## Exporting to Excel
+## Stint Analysis (Stint tab)
 
-Click **Export CSV (Excel)** to write the full-resolution session to a CSV file
-(`;` separator). All channels are exported: standard telemetry, hybrid
-(SoC, ERS), per-wheel tyre data (temperature carcass/inner/centre/outer, rim
-temp, pressure, wear) and per-wheel brake data (temp, wear). Useful for custom
-analysis, pivot tables or overlay charts.
+The Stint tab provides a lap-by-lap view of the entire session, ideal for analyzing degradation, fuel consumption, and strategy.
+
+### Available metrics
+
+Enable one or more metrics with the checkboxes:
+
+- **Lap time**: total time for each lap (white line)
+- **Tyre temp**: average carcass temperature per lap, one line per wheel (FL=cyan, FR=yellow, RL=green, RR=red)
+- **Tyre pressure**: average pressure per lap, one line per wheel
+- **Tyre wear**: wear at end of lap, one line per wheel
+- **SoC**: State of Charge at start and end of lap (purple=start, green=end)
+- **Brake temp**: average brake temperature per lap, one line per wheel
+- **Speed**: average and maximum speed per lap (yellow=avg, cyan=max)
+
+### Lane layout
+
+Each metric gets its own horizontal lane with:
+- Independent Y-axis scale (shown on the left)
+- Title and unit label
+- Alternating background colors for visual separation
+- Legend at the bottom showing color coding
+
+### Exclude anomalous laps
+
+Enable "Exclude anomalous" to filter out:
+- Out-laps and in-laps (laps shorter than 50% of median lap time)
+- Pit stops and warmup laps (laps longer than 115% of median lap time)
+
+This leaves only "flying laps" for cleaner trend analysis.
+
+### Hover probe
+
+Move the mouse over any lane to see the exact value for that lap, including:
+- Metric name and wheel position (e.g., "Tyre temp FL")
+- Lap number
+- Formatted value with unit (e.g., "96.4 °C" or "1:42.385")
+
+### Use cases
+
+**Tyre degradation**: enable "Tyre temp" and "Tyre wear" to see how temperatures and wear evolve over a stint. If temps rise while wear accelerates, the compound is overheating.
+
+**Fuel effect on lap time**: enable "Lap time" and "SoC end" to see if lap times improve as fuel burns off (lighter car) or worsen due to tyre degradation.
+
+**Brake management**: enable "Brake temp" to monitor brake temperatures across a stint. If temps climb lap after lap, consider brake duct adjustments or lifting points.   
+
+## Export Session (CSV)
+
+Click "Export Session (CSV)" in the toolbar to export the entire session as a semicolon-separated CSV file, optimized for Excel in European locales.
+
+### Column structure (45 columns total)
+
+| Group | Columns |
+|-------|---------|
+| Identifiers | `Lap`, `Time_s` |
+| Dynamics | `Speed_kmh`, `Throttle_pct`, `Brake_pct`, `Steering`, `RPM` |
+| Hybrid | `SoC_pct`, `ERS_pct_s` |
+| Tyre carcass | `TyreTempFL/FR/RL/RR` |
+| Tyre zones | `TyreIn/Ct/Ot` + `FL/FR/RL/RR` (12 columns) |
+| Tyre rim | `TyreRimFL/FR/RL/RR` |
+| Tyre pressure | `TyrePressFL/FR/RL/RR` |
+| Tyre wear | `TyreWearFL/FR/RL/RR` |
+| Brake temp | `BrakeTempFL/FR/RL/RR` |
+| Brake wear | `BrakeWearFL/FR/RL/RR` |
+
+### Excel usage
+
+1. Open Excel → Data → From Text/CSV
+2. Select the exported file
+3. Set delimiter to semicolon (`;`)
+4. Excel will recognize the structure and create a table
+
+You can then use pivot tables, charts, or conditional formatting to analyze trends.
 
 ## Typical workflows
 

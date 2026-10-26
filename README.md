@@ -19,11 +19,13 @@ computation.
 - Automatic session parsing with lap list and lap times (`hh:mm:ss.fff`)
 - Session header showing detected track name, date and car name
 
-### Three-tab layout
+### Four-tab layout
 - **Car**: speed, throttle, brake, steering, RPM, hide shift cuts, SoC, ERS power
 - **Tyres**: four compound lanes (one per wheel), each with a temperature
   panel (carcass + inner/centre/outer zones + rim temp) and a pressure/wear panel
 - **Brakes**: per-wheel brake temp and brake wear
+- **Stint**: lap-by-lap analysis across the entire session (Lap time, Tyre temp, 
+  Tyre pressure, Tyre wear, SoC, Brake temp, Speed)
 - Tabs with unavailable channels are automatically disabled
 
 ### Visualization
@@ -34,6 +36,10 @@ computation.
   and corner exits across laps
 - **Vertical cursor**: slider-driven reference line across all lanes with
   metres/seconds readout for precise event alignment
+- **Track map**: GPS-based track reconstruction in the top-right corner with
+  colored dots (one per compared lap) that move along the track in sync with
+  the cursor. Automatic detection of GPS tables (lat/lon or multi-axis).
+  Fallback to session lap profile when comparing saved laps (no GPS available)
 - **Hover probe**: move the mouse over any trace to read the exact value
   at that point, with a snapping dot and overlay showing lap/wheel/channel
 - Peak-preserving downsampling (min/max bucketing): brake spikes and rev
@@ -86,11 +92,15 @@ computation.
   **automatically migrated** from the previous location on first launch
 
 ### Export
-- Full-resolution CSV export (Excel-friendly, `;` separator)
-- All channels included: standard telemetry + hybrid (SoC, ERS) + per-wheel
-  tyre data (carcass, zones, rim, pressure, wear) + per-wheel brake data
-  (temp, wear) for comprehensive offline analysis
-- Compatible with Excel pivot tables, custom charts, and third-party tools
+- **Export Session (CSV)**: exports the entire session with 45 columns
+- Correct column alignment (Lap, Time, Speed, Throttle, Brake, Steering, RPM, SoC, ERS, then all tyre/brake data grouped by metric)
+- Semicolon-separated for Excel compatibility in European locales
+- UTF-8 encoding with proper formatting (0.## for most values, 0.#### for time/steering)
+
+### UI polish
+- Thin (6px) scrollbars that appear on hover over lap lists, invisible at rest for a cleaner UI
+- Custom dark theme matching the app's palette
+- Stint metrics use checkbox selection instead of dropdown for faster toggling
 
 ## Typical workflows
 
@@ -114,6 +124,10 @@ deployment strategy.
 **Energy management (Hypercar):** enable SoC and ERS power in the Car tab to
 see where you deploy (positive ERS, SoC dropping) and where you regen
 (negative ERS, SoC rising). Compare laps to optimize deployment strategy.
+
+**Analyse a stint (Stint tab):** load a session, switch to Stint tab, enable "Tyre temp" and "Tyre pressure" to see how temperatures and pressures evolve lap-by-lap. Use "Exclude anomalous" to filter out out-laps and pit stops. Hover over any point to read exact values for that lap.
+
+**Track position analysis:** enable the track map (appears automatically when GPS data is available). Drag the cursor slider to see where each lap is on the circuit. Compare two laps to see if one driver brakes earlier or carries more speed through specific corners.
 
 See the [docs folder](docs/) for the full documentation:
 - [DuckDB schema](docs/LMU_DUCKDB_SCHEMA.md)
