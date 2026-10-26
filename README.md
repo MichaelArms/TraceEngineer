@@ -29,6 +29,7 @@ computation.
 - Tabs with unavailable channels are automatically disabled
 
 ### Visualization
+![Track map with moving dots](docs/gifs/car-tab.gif)
 - MoTeC-style lane chart drawn with pure WPF — no charting dependencies,
   no native-renderer pitfalls
 - **Time or Distance X-axis**: switch between time-based and distance-based
@@ -76,6 +77,7 @@ computation.
 - Wheel labels (FL/FR/RL/RR) at line start for easy identification
 
 ### Lap comparison
+![Two Laps Comparison](docs/gifs/car-comparison.gif)
 - Compare up to 2 laps: session vs session, session vs saved, saved vs saved
 - **Automatic time-delta trace** (distance mode): shows where lap 2 gains or
   loses time relative to lap 1, with final gap readout
@@ -91,7 +93,12 @@ computation.
 - Saved laps are stored in `%APPDATA%\TraceEngineer\SavedLaps` and are
   **automatically migrated** from the previous location on first launch
 
+## Stint Analysis (Stint tab)
+![Stint analysis with multiple metrics](docs/gifs/stint-tab.gif)
+The Stint tab provides a lap-by-lap view of the entire session, ideal for analyzing degradation, fuel consumption, and strategy.
+
 ### Export
+![Entire Session Export](docs/gifs/export-session.gif)
 - **Export Session (CSV)**: exports the entire session with 45 columns
 - Correct column alignment (Lap, Time, Speed, Throttle, Brake, Steering, RPM, SoC, ERS, then all tyre/brake data grouped by metric)
 - Semicolon-separated for Excel compatibility in European locales
