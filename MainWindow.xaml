@@ -7,8 +7,6 @@
 
 
     <Window.Resources>
-        <!-- Rimuove cornice e sfondo di selezione predefiniti: l'unico
-            indicatore visivo sarà la barretta colorata a sinistra -->
         <Style x:Key="PlainListBoxItem" TargetType="ListBoxItem">
             <Setter Property="Template">
                 <Setter.Value>
@@ -53,7 +51,7 @@
         <!-- Bottone neutro: sfondo scuro, bordo sottile, hover che schiarisce -->
         <Style x:Key="ToolButton" TargetType="Button">
             <Setter Property="Foreground" Value="#E8E8EE"/>
-            <Setter Property="Background" Value="#2A2A2E"/>
+            <Setter Property="Background" Value="#2A2A2E"/> 
             <Setter Property="BorderBrush" Value="#3A3A3E"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="14,7"/>
@@ -198,7 +196,120 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-        </Style>                
+        </Style>
+
+        <!-- RepeatButton trasparente per il click-sul-track della scrollbar -->
+        <Style x:Key="TrackRepeatButton" TargetType="RepeatButton">
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- ScrollViewer con colonna scrollbar a larghezza fissa (per scrollbar sottile) -->
+        <Style TargetType="ScrollViewer">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollViewer">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="6"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <ScrollContentPresenter Grid.Column="0" Grid.Row="0"
+                                Margin="{TemplateBinding Padding}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                CanContentScroll="{TemplateBinding CanContentScroll}"/>
+
+                            <ScrollBar x:Name="PART_VerticalScrollBar"
+                                Grid.Column="1" Grid.Row="0"
+                                Orientation="Vertical"
+                                Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                                Value="{TemplateBinding VerticalOffset}"
+                                Maximum="{TemplateBinding ScrollableHeight}"
+                                ViewportSize="{TemplateBinding ViewportHeight}"
+                                Width="6"/>
+
+                            <ScrollBar x:Name="PART_HorizontalScrollBar"
+                                Grid.Column="0" Grid.Row="1"
+                                Orientation="Horizontal"
+                                Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"
+                                Value="{TemplateBinding HorizontalOffset}"
+                                Maximum="{TemplateBinding ScrollableWidth}"
+                                ViewportSize="{TemplateBinding ViewportWidth}"
+                                Height="6"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Scrollbar a scomparsa: sottile, invisibile finché non passi sulla lista -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="4"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand"
+                                                  Style="{StaticResource TrackRepeatButton}"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Style>
+                                            <Style TargetType="Thumb">
+                                                <Setter Property="Opacity" Value="0"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBox}}" Value="True">
+                                                        <Setter Property="Opacity" Value="1"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Thumb.Style>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="Bd" Background="#5A5A64"
+                                                        CornerRadius="2" Margin="1"/>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#7A7A86"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#8A8A96"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand"
+                                                  Style="{StaticResource TrackRepeatButton}"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Height" Value="4"/>
+                    <Setter Property="Width" Value="auto"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="14">
@@ -213,42 +324,81 @@
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
             <Button Content="Open .duckdb file" Style="{StaticResource ToolButton}"
                     Width="170" Height="36" Margin="0,0,8,0" Click="OpenDuckDb_Click"/>
-            <Button Content="Export CSV (Excel)" Style="{StaticResource ToolButton}"
+            <Button Content="Export Session (CSV)" Style="{StaticResource ToolButton}"
                     Width="170" Height="36" Margin="0,0,8,0" Click="ExportCsv_Click"/>
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="13" Foreground="#7FE07F" Margin="14,0,0,0"/>
         </StackPanel>
 
         <!-- Channel selectors -->
-        <StackPanel Grid.Row="1" Margin="0,0,0,8">
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                <RadioButton x:Name="RbTabCar"    Content="Car"    GroupName="Tabs" IsChecked="True"
-                             Style="{StaticResource TabButton}" Click="Tab_Click"/>
-                <RadioButton x:Name="RbTabTyres"  Content="Tyres"  GroupName="Tabs"
-                             Style="{StaticResource TabButton}" Click="Tab_Click"/>
-                <RadioButton x:Name="RbTabBrakes" Content="Brakes" GroupName="Tabs"
-                             Style="{StaticResource TabButton}" Click="Tab_Click"/>
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <TextBlock Text="    X axis:" VerticalAlignment="Center" Margin="10,0,8,0" Foreground="#808085"/>
-                <RadioButton x:Name="RbTime" Content="Time" GroupName="Axis"
-                             VerticalAlignment="Center" Margin="0,0,12,0" Foreground="White" Click="Axis_Click"/>
-                <RadioButton x:Name="RbDistance" Content="Distance" GroupName="Axis" IsChecked="True"
-                             VerticalAlignment="Center" Foreground="White" Click="Axis_Click"/>
+            <StackPanel Grid.Column="0">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <RadioButton x:Name="RbTabCar"    Content="Car"    GroupName="Tabs" IsChecked="True"
+                                 Style="{StaticResource TabButton}" Click="Tab_Click"/>
+                    <RadioButton x:Name="RbTabTyres"  Content="Tyres"  GroupName="Tabs"
+                                 Style="{StaticResource TabButton}" Click="Tab_Click"/>
+                    <RadioButton x:Name="RbTabBrakes" Content="Brakes" GroupName="Tabs"
+                                 Style="{StaticResource TabButton}" Click="Tab_Click"/>
+                    <RadioButton x:Name="RbTabStint" Content="Stint" GroupName="Tabs"
+                                 Style="{StaticResource TabButton}" Click="Tab_Click"/>                                 
+
+                    <TextBlock Text="    X axis:" VerticalAlignment="Center" Margin="10,0,8,0" Foreground="#808085"/>
+                    <RadioButton x:Name="RbTime" Content="Time" GroupName="Axis"
+                                 VerticalAlignment="Center" Margin="0,0,12,0" Foreground="White" Click="Axis_Click"/>
+                    <RadioButton x:Name="RbDistance" Content="Distance" GroupName="Axis" IsChecked="True"
+                                 VerticalAlignment="Center" Foreground="White" Click="Axis_Click"/>
+                </StackPanel>
+
+                <WrapPanel x:Name="OptionsPanel">
+                    <TextBlock Text="Base:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#808085"/>
+                    <CheckBox x:Name="ChkSpeed"    Content="Speed"    IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                    <CheckBox x:Name="ChkThrottle" Content="Throttle" IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                    <CheckBox x:Name="ChkBrake"    Content="Brake"    IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                    <CheckBox x:Name="ChkSteering" Content="Steering" IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                    <CheckBox x:Name="ChkRpm"      Content="RPM"      IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                    <CheckBox x:Name="ChkHideShifts" Content="Hide shift cuts" IsChecked="True" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+
+                    <TextBlock Text="   Hybrid:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#808085"/>
+                    <CheckBox x:Name="ChkSoC"       Content="SoC"        IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                    <CheckBox x:Name="ChkErs"       Content="ERS power"  IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
+                </WrapPanel>
+                <WrapPanel x:Name="StintOptionsPanel" Visibility="Collapsed">
+                    <TextBlock Text="Stint metrics:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#808085"/>
+                    <CheckBox x:Name="ChkStLapTime" Content="Lap time" IsChecked="True"
+                              VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
+                    <CheckBox x:Name="ChkStTyreTemp" Content="Tyre temp" IsChecked="False"
+                              VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
+                    <CheckBox x:Name="ChkStTyrePress" Content="Tyre pressure" IsChecked="False"
+                              VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
+                    <CheckBox x:Name="ChkStTyreWear" Content="Tyre wear" IsChecked="False"
+                              VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
+                    <CheckBox x:Name="ChkStSoC" Content="SoC" IsChecked="False"
+                              VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
+                    <CheckBox x:Name="ChkStBrakeTemp" Content="Brake temp" IsChecked="False"
+                              VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
+                    <CheckBox x:Name="ChkStBrakeWear" Content="Brake wear" IsChecked="False"
+                              VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
+                    <CheckBox x:Name="ChkStSpeed" Content="Speed" IsChecked="False"
+                              VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
+
+                    <TextBlock Text="   " VerticalAlignment="Center"/>
+                    <CheckBox x:Name="ChkStintExclude" Content="Exclude anomalous" IsChecked="False"
+                              VerticalAlignment="Center" Click="StintExclude_Changed" Foreground="White"/>
+                </WrapPanel>              
             </StackPanel>
 
-            <WrapPanel x:Name="OptionsPanel">
-                <TextBlock Text="Base:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#808085"/>
-                <CheckBox x:Name="ChkSpeed"    Content="Speed"    IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-                <CheckBox x:Name="ChkThrottle" Content="Throttle" IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-                <CheckBox x:Name="ChkBrake"    Content="Brake"    IsChecked="True"  VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-                <CheckBox x:Name="ChkSteering" Content="Steering" IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-                <CheckBox x:Name="ChkRpm"      Content="RPM"      IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-                <CheckBox x:Name="ChkHideShifts" Content="Hide shift cuts" IsChecked="True" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-
-                <TextBlock Text="   Hybrid:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#808085"/>
-                <CheckBox x:Name="ChkSoC"       Content="SoC"        IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-                <CheckBox x:Name="ChkErs"       Content="ERS power"  IsChecked="False" VerticalAlignment="Center" Margin="0,0,14,0" Click="Channel_Click" Foreground="White"/>
-            </WrapPanel>
-        </StackPanel>
+            <Border Grid.Column="1" x:Name="TrackMapBorder" Visibility="Collapsed"
+                    Background="#212124" BorderBrush="#3A3A3E" BorderThickness="1"
+                    CornerRadius="4" Width="170" Height="120"
+                    VerticalAlignment="Top" Margin="8,0,0,0">
+                <Canvas x:Name="TrackMapCanvas" ClipToBounds="True"/>
+            </Border>
+        </Grid>
 
         <!-- Session info -->
         <TextBlock Grid.Row="2" x:Name="SessionInfo" FontSize="13" Foreground="#B0B0B0" Margin="0,0,0,8"/>

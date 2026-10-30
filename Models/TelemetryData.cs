@@ -64,6 +64,9 @@ public class TelemetryPoint
     public double TyreOtFR { get; set; }
     public double TyreOtRL { get; set; }
     public double TyreOtRR { get; set; }
+    // Coordinate mondo proiettabili sulla track map (popolate dal reader)
+    public double MapX { get; set; }
+    public double MapY { get; set; }    
 }
 
 public class LapMarker

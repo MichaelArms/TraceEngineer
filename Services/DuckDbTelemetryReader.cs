@@ -364,7 +364,122 @@ public class DuckDbTelemetryReader
                 points[i].TyreOtFL = zOt[0][i]; points[i].TyreOtFR = zOt[1][i];
                 points[i].TyreOtRL = zOt[2][i]; points[i].TyreOtRR = zOt[3][i];
             }
-        } 
+        }
+        var gps = ReadGps(connStr, n);
+        if (gps != null)
+        {
+            AvailableChannels.Add("Gps");
+            for (int i = 0; i < n; i++)
+            {
+                points[i].MapX = gps.Value.Xs[i];
+                points[i].MapY = gps.Value.Ys[i];
+            }
+        }         
 
     }
+
+    private (double[] Xs, double[] Ys)? ReadGps(string connStr, int n)
+    {
+        try
+        {
+            // ---- Path A: tabelle lat/lon separate (pattern LMU) ----
+            string? latT = FindTable(connStr, "latitude");
+            string? lonT = FindTable(connStr, "longitude");
+            if (latT != null && lonT != null)
+            {
+                var lat = ReadSingleTable(connStr, latT, n);
+                var lon = ReadSingleTable(connStr, lonT, n);
+                if (lat != null && lon != null)
+                {
+                    // Scala la longitudine per cos(lat): X/Y proporzionali ai metri
+                    double spanLat = lat.Max() - lat.Min();
+                    double spanLon = lon.Max() - lon.Min();
+                    bool degrees = spanLat < 1.0 && spanLon < 1.0;
+                    double k = degrees ? Math.Cos(lat.Average() * Math.PI / 180.0) : 1.0;
+
+                    var xs = new double[n]; var ys = new double[n];
+                    for (int i = 0; i < n; i++) { xs[i] = lon[i] * k; ys[i] = lat[i]; }
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[GPS] lat/lon: {latT} / {lonT} spanLat={spanLat:F4} spanLon={spanLon:F4} degrees={degrees} k={k:F3}");
+                    return (xs, ys);
+                }
+            }
+
+            // ---- Path B: tabella unica con più assi numerici (altri sim) ----
+            string? table = FindTable(connStr, "gps") ?? FindTable(connStr, "position");
+            if (table == null) { System.Diagnostics.Debug.WriteLine("[GPS] no table found"); return null; }
+
+            var cols = new List<string>();
+            using (var c = new DuckDBConnection(connStr))
+            {
+                c.Open();
+                using var cc = c.CreateCommand();
+                cc.CommandText =
+                    $"SELECT column_name FROM information_schema.columns " +
+                    $"WHERE table_name='{table}' AND data_type IN ('DOUBLE','FLOAT','REAL','BIGINT','INTEGER') " +
+                    "ORDER BY ordinal_position";
+                using var rr = cc.ExecuteReader();
+                while (rr.Read()) cols.Add(rr.GetString(0));
+            }
+            if (cols.Count < 2) { System.Diagnostics.Debug.WriteLine($"[GPS] {table}: too few numeric cols"); return null; }
+
+            var axes = cols.Take(3).ToList();
+            var sel = string.Join(", ", axes.Select(c2 => $"\"{c2}\""));
+            var data = new List<double[]>();
+            using (var c = new DuckDBConnection(connStr))
+            {
+                c.Open();
+                using var cc = c.CreateCommand();
+                cc.CommandText = $"SELECT {sel} FROM \"{table}\" ORDER BY rowid";
+                using var rr = cc.ExecuteReader();
+                while (rr.Read())
+                {
+                    var row = new double[axes.Count];
+                    for (int i = 0; i < axes.Count; i++) row[i] = rr.IsDBNull(i) ? 0 : rr.GetDouble(i);
+                    data.Add(row);
+                }
+            }
+            if (data.Count == 0) return null;
+
+            var ranges = new double[axes.Count];
+            for (int i = 0; i < axes.Count; i++)
+                ranges[i] = data.Max(d => d[i]) - data.Min(d => d[i]);
+            var order = Enumerable.Range(0, axes.Count)
+                .OrderByDescending(i => ranges[i]).Take(2).OrderBy(i => i).ToArray();
+            int a = order[0], b = order[1];
+
+            var xs2 = new double[n]; var ys2 = new double[n];
+            for (int i = 0; i < n; i++)
+            {
+                int src = (int)((long)i * data.Count / n);
+                if (src >= data.Count) src = data.Count - 1;
+                xs2[i] = data[src][a];
+                ys2[i] = data[src][b];
+            }
+            System.Diagnostics.Debug.WriteLine($"[GPS] multi-axis: {table} axes={axes[a]},{axes[b]}");
+            return (xs2, ys2);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[GPS] failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static string? FindTable(string connStr, string keyword)
+    {
+        try
+        {
+            using var conn = new DuckDBConnection(connStr);
+            conn.Open();
+            using var c = conn.CreateCommand();
+            c.CommandText =
+                "SELECT table_name FROM information_schema.tables " +
+                $"WHERE lower(table_name) LIKE '%{keyword}%' ORDER BY table_name LIMIT 1";
+            using var r = c.ExecuteReader();
+            return r.Read() ? r.GetString(0) : null;
+        }
+        catch { return null; }
+    }    
+
 }
