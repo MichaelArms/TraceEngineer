@@ -8,6 +8,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>TraceEngineer</RootNamespace>
     <AssemblyName>TraceEngineer</AssemblyName>
+    <Version>0.6.2</Version>
   </PropertyGroup>
 
   <ItemGroup>

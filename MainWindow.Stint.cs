@@ -27,13 +27,12 @@ public partial class MainWindow : Window
         }
 
         var stats = _lapStats;
-        if (ChkStintExclude.IsChecked == true)
+        if (ChkStintExclude.IsChecked == true && stats.Count > 3)
         {
-            double med = Median(stats.Select(s => s.LapTime).ToList());
-            double thrHigh = med * AnomalousFactor;   // giri lenti (out-lap, pit, warmup)
-            double thrLow = med * IncompleteFactor;   // giri tronchi/incompleti (in-lap)
-            stats = stats.Where(s => s.LapTime <= thrHigh && s.LapTime >= thrLow).ToList();
+            // Trim sessione: taglia il primo e l'ultimo giro (out-lap / in-lap / box)
+            stats = stats.GetRange(1, stats.Count - 2);
         }
+
         if (stats.Count == 0)
         {
             Center(ChartCanvas.ActualWidth, ChartCanvas.ActualHeight,
@@ -302,15 +301,27 @@ public partial class MainWindow : Window
         _lapStats.Clear();
         if (_allPoints == null || _allPoints.Count == 0 || _lapInfos == null) return;
 
+        double maxLapDistance = 0; // Terrà traccia della lunghezza del giro più lungo
+
         foreach (var lap in _lapInfos)
         {
             var pts = _allPoints.Where(p => p.Time >= lap.StartTime && p.Time < lap.EndTime).ToList();
             if (pts.Count < 5) continue;
 
+            // Distanza percorsa in QUESTO specifico giro (differenza tra ultimo e primo punto del giro)
+            double currentLapDistance = pts[^1].Distance - pts[0].Distance;
+            
+            // Aggiorna la lunghezza massima trovata (il giro più completo)
+            if (currentLapDistance > maxLapDistance)
+            {
+                maxLapDistance = currentLapDistance;
+            }
+
             _lapStats.Add(new LapStats
             {
                 LapNumber = lap.LapNumber,
                 LapTime = lap.LapTime,
+                Distance = currentLapDistance, // Ora è la distanza del singolo giro
                 AvgSpeed = pts.Average(p => p.Speed),
                 MaxSpeed = pts.Max(p => p.Speed),
                 TyreTempFL = pts.Average(p => p.TyreTempFL),
@@ -337,6 +348,9 @@ public partial class MainWindow : Window
                 BrakeWearRR = pts.Average(p => p.BrakeWearRR),
             });
         }
+
+        // La lunghezza ufficiale del tracciato è la distanza del giro più lungo registrato
+        _trackLengthMeters = maxLapDistance;
     }
 
     private static double Median(List<double> v)

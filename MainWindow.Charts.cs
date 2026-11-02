@@ -91,6 +91,62 @@ public partial class MainWindow : Window
             if (deltaData.Count < 2) showDelta = false;
         }
 
+        // ---- CALCOLO MICROSETTORI (per sfondo dinamico) ----
+        var microsectors = new List<(double StartDist, double EndDist, double Delta, double SpeedDiff)>();
+        if (showDelta && entries.Count == 2 && deltaData.Count > 2)
+        {
+            // Dividi in ~25 microsettori
+            double sectorLength = deltaData[^1].X / 25.0;
+            double currentStart = 0;
+            double deltaAtStart = deltaData[0].Y;
+            
+            for (int di = 0; di < deltaData.Count; di++)
+            {
+                var (dist, delta) = deltaData[di];
+                if (dist - currentStart >= sectorLength && di < deltaData.Count - 1)
+                {
+                    double deltaAtEnd = delta;
+                    double sectorDelta = deltaAtEnd - deltaAtStart;
+                    
+                    // Calcola velocità media nei due giri in questo settore
+                    double refSpeedSum = 0, cmpSpeedSum = 0;
+                    int refCount = 0, cmpCount = 0;
+                    foreach (var p in entries[0].Points)
+                    {
+                        if (p.Distance >= currentStart && p.Distance < dist)
+                        {
+                            refSpeedSum += p.Speed;
+                            refCount++;
+                        }
+                    }
+                    foreach (var p in entries[1].Points)
+                    {
+                        if (p.Distance >= currentStart && p.Distance < dist)
+                        {
+                            cmpSpeedSum += p.Speed;
+                            cmpCount++;
+                        }
+                    }
+                    double speedDiff = 0;
+                    if (refCount > 0 && cmpCount > 0)
+                    {
+                        speedDiff = (cmpSpeedSum / cmpCount) - (refSpeedSum / refCount);
+                    }
+                    
+                    microsectors.Add((currentStart, dist, sectorDelta, speedDiff));
+                    currentStart = dist;
+                    deltaAtStart = delta;
+                }
+            }
+            // Ultimo settore
+            if (currentStart < deltaData[^1].X)
+            {
+                double sectorDelta = deltaData[^1].Y - deltaAtStart;
+                microsectors.Add((currentStart, deltaData[^1].X, sectorDelta, 0));
+            }
+        }
+
+
         double plotW = W - LeftPad - RightPad;
         double plotH = H - TopPad - BottomPad;
         if (plotW < 30 || plotH < 30) return;
@@ -182,6 +238,45 @@ public partial class MainWindow : Window
             };
             ChartCanvas.Children.Add(zeroLine);
 
+            // Sfondo dinamico per microsettori nella lane delta
+            if (microsectors.Count > 0)
+            {
+                foreach (var (startDist, endDist, sectorDelta, speedDiff) in microsectors)
+                {
+                    double cx1 = LeftPad + (startDist / xSpan) * plotW;
+                    double cx2 = LeftPad + (endDist / xSpan) * plotW;
+                    double width = cx2 - cx1;
+                    
+                    if (Math.Abs(sectorDelta) < 0.01) continue;
+                    
+                    Color baseColor = sectorDelta > 0 ? LapColors[0] : LapColors[1];
+                    double maxDelta = 0.5;
+                    double opacity = Math.Min(0.20, Math.Abs(sectorDelta) / maxDelta);
+                    
+                    var rect = new Rectangle
+                    {
+                        Width = width,
+                        Height = traceH,
+                        Fill = new SolidColorBrush(Color.FromArgb((byte)(opacity * 255), baseColor.R, baseColor.G, baseColor.B))
+                    };
+                    Canvas.SetLeft(rect, cx1);
+                    Canvas.SetTop(rect, traceTop);
+                    ChartCanvas.Children.Add(rect);
+                    
+                    // Etichetta con il delta tempo del microsettore
+                    if (Math.Abs(sectorDelta) >= 0.03)
+                    {
+                        string label = sectorDelta > 0 ? $"+{sectorDelta:F2}s" : $"{sectorDelta:F2}s";
+                        var txt = Label(label, 9, Color.FromArgb(240, 255, 255, 255));
+                        txt.FontWeight = FontWeights.SemiBold;
+                        double centerX = cx1 + width / 2;
+                        Canvas.SetLeft(txt, centerX - 15);
+                        Canvas.SetTop(txt, traceTop + 2); // in alto
+                        ChartCanvas.Children.Add(txt);
+                    }
+                }
+            }
+
             // traccia delta
             var poly = new Polyline
             {
@@ -192,19 +287,28 @@ public partial class MainWindow : Window
             };
             ChartCanvas.Children.Add(poly);
 
-            // etichetta con gap finale
+            // etichetta corsia delta: interamente nel gutter sinistro, su più righe
             double finalGap = deltaData[^1].Y;
             string gapTxt = finalGap >= 0 ? $"+{finalGap:F3}s" : $"{finalGap:F3}s";
-            var name = Label($"Δ Time (lap2 − lap1)   final gap: {gapTxt}", 11, Color.FromRgb(255, 77, 210));
-            name.FontWeight = FontWeights.SemiBold;
+
+            // se la corsia è bassa, togliamo la riga "final gap" per non sbordare
+            bool tallEnough = laneH >= 58;
+            string deltaLabel = tallEnough
+                ? $"Δ Time\nlap2 − lap1\nfinal gap\n{gapTxt}"
+                : $"Δ Time\nlap2 − lap1\n{gapTxt}";
+
+            var name = new TextBlock
+            {
+                Text = deltaLabel,
+                FontSize = tallEnough ? 10 : 8.5,
+                Foreground = new SolidColorBrush(Color.FromRgb(255, 77, 210)),
+                FontWeight = FontWeights.SemiBold,
+                Width = Math.Max(40, LeftPad - 10),
+                TextWrapping = TextWrapping.Wrap
+            };
             Canvas.SetLeft(name, 5);
             Canvas.SetTop(name, dTop + 3);
             ChartCanvas.Children.Add(name);
-
-            var unit = Label("s", 9, "#FFFFFF");
-            Canvas.SetLeft(unit, 5);
-            Canvas.SetTop(unit, dTop + 18);
-            ChartCanvas.Children.Add(unit);
         }
 
         // ---- TRACCE DEI CANALI ----
@@ -253,6 +357,51 @@ public partial class MainWindow : Window
                 VMin = vMin,
                 VSpan = vSpan
             });
+
+            // Sfondo dinamico per microsettori (solo lane velocità in compare mode)
+            if (lane.Name == "Speed" && compareMode && microsectors.Count > 0)
+            {
+                foreach (var (startDist, endDist, sectorDelta, speedDiff) in microsectors)
+                {
+                    // Coordinate canvas
+                    double cx1 = LeftPad + (startDist / xSpan) * plotW;
+                    double cx2 = LeftPad + (endDist / xSpan) * plotW;
+                    double width = cx2 - cx1;
+                    
+                    // Ignora settori con delta trascurabile
+                    if (Math.Abs(sectorDelta) < 0.01) continue;
+                    
+                    // Colore: verde/ciano se si guadagna (delta negativo = giro2 più veloce), rosso/arancio se si perde
+                    // Nota: deltaData è (tCmp - tRef), quindi positivo = giro2 più lento = giro1 guadagna
+                    Color baseColor = sectorDelta > 0 ? LapColors[0] : LapColors[1];
+                    
+                    // Opacità proporzionale all'ampiezza
+                    double maxDelta = 0.5; // 0.5 secondi = opacità massima
+                    double opacity = Math.Min(0.20, Math.Abs(sectorDelta) / maxDelta);
+                    
+                    var rect = new Rectangle
+                    {
+                        Width = width,
+                        Height = traceH,
+                        Fill = new SolidColorBrush(Color.FromArgb((byte)(opacity * 255), baseColor.R, baseColor.G, baseColor.B))
+                    };
+                    Canvas.SetLeft(rect, cx1);
+                    Canvas.SetTop(rect, traceTop);
+                    ChartCanvas.Children.Add(rect);
+                    
+                    // Etichetta con la differenza di velocità media del microsettore
+                    if (Math.Abs(speedDiff) >= 2.0) // soglia minima 2 km/h
+                    {
+                        string label = speedDiff > 0 ? $"+{speedDiff:F0} km/h" : $"{speedDiff:F0} km/h";
+                        var txt = Label(label, 8, Color.FromArgb(220, 255, 255, 255));
+                        double centerX = cx1 + width / 2;
+                        Canvas.SetLeft(txt, centerX - 15);
+                        Canvas.SetTop(txt, traceTop + 2);
+                        ChartCanvas.Children.Add(txt);
+                    }
+                }
+            }
+
 
             if (lane.Wheel != null)
             {
@@ -320,6 +469,8 @@ public partial class MainWindow : Window
                 }
             }
         }
+
+        
 
         // ---- ETICHETTE CORSIE CANALI ----
         for (int i = 0; i < lanes.Count; i++)

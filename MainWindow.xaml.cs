@@ -38,11 +38,13 @@ public partial class MainWindow : Window
     private List<Point>? _mapOutline;
     private List<double> _mapCumLen = new();
     private double _mapTotalLen;
+    private double _trackLengthMeters;
     private double _mapRawMinX, _mapRawMaxX, _mapRawMinY, _mapRawMaxY;
     private bool _mapHasGps;
     private List<Ellipse> _mapDots = new();
     private List<TelemetryPoint>? _sessionMapRaw;
-    private List<Point>? _mapProfile;   // Profilo già proiettato su canvas        
+    private List<Point>? _mapProfile;   // Profilo già proiettato su canvas
+       
 
     private sealed class HoverLane
     {
@@ -76,6 +78,7 @@ public partial class MainWindow : Window
         public double SoCStart, SoCEnd;
         public double BrakeTempFL, BrakeTempFR, BrakeTempRL, BrakeTempRR;
         public double BrakeWearFL, BrakeWearFR, BrakeWearRL, BrakeWearRR;
+        public double Distance;        
     }
     private sealed class HoverStintLane
     {

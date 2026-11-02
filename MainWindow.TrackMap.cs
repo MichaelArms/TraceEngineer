@@ -31,14 +31,16 @@ public partial class MainWindow : Window
         foreach (var p in _mapProfile) poly.Points.Add(p);
         TrackMapCanvas.Children.Add(poly);
 
-        // Start/finish
+        // Start/finish: ora l'indice 0 è garantito essere la linea del traguardo
         var sf = new Ellipse
         {
-            Width = 5, Height = 5,
-            Fill = new SolidColorBrush(Color.FromRgb(255, 255, 255))
+            Width = 6, Height = 6,
+            Fill = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+            Stroke = new SolidColorBrush(Color.FromRgb(255, 80, 80)), // Bordo rosso per visibilità
+            StrokeThickness = 1.5
         };
-        Canvas.SetLeft(sf, _mapProfile[0].X - 2.5);
-        Canvas.SetTop(sf, _mapProfile[0].Y - 2.5);
+        Canvas.SetLeft(sf, _mapProfile[0].X - 3);
+        Canvas.SetTop(sf, _mapProfile[0].Y - 3);
         TrackMapCanvas.Children.Add(sf);
 
         // Pallini per ogni giro confrontato
@@ -54,7 +56,8 @@ public partial class MainWindow : Window
             TrackMapCanvas.Children.Add(dot);
             _mapDots.Add(dot);
         }
-
+        // Aggiorna etichetta lunghezza (forza refresh quando la mappa diventa visibile)
+        TrackLenText.Text = $"{_trackLengthMeters:F0} m";
         TrackMapBorder.Visibility = Visibility.Visible;
         UpdateCursorVisual();
     }

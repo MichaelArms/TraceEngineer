@@ -312,31 +312,40 @@
         </Style>
     </Window.Resources>
 
+    <!-- ═══════════════════════════════════════════════════════════
+         RADICE: 2 righe
+           Riga 0 = HEADER  (controlli a sinistra + track map a destra)
+           Riga 1 = MAIN    (lista giri + lanes a tutta larghezza)
+         ═══════════════════════════════════════════════════════════ -->
     <Grid Margin="14">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Toolbar -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <Button Content="Open .duckdb file" Style="{StaticResource ToolButton}"
-                    Width="170" Height="36" Margin="0,0,8,0" Click="OpenDuckDb_Click"/>
-            <Button Content="Export Session (CSV)" Style="{StaticResource ToolButton}"
-                    Width="170" Height="36" Margin="0,0,8,0" Click="ExportCsv_Click"/>
-            <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="13" Foreground="#7FE07F" Margin="14,0,0,0"/>
-        </StackPanel>
-
-        <!-- Channel selectors -->
-        <Grid Grid.Row="1" Margin="0,0,0,8">
+        <!-- ═══════════ HEADER ═══════════ -->
+        <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-            <StackPanel Grid.Column="0">
+            <!-- Toolbar -->
+            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="0,0,0,10">
+                <Button Content="Open .duckdb file" Style="{StaticResource ToolButton}"
+                        Width="170" Height="36" Margin="0,0,8,0" Click="OpenDuckDb_Click"/>
+                <Button Content="Export Session (CSV)" Style="{StaticResource ToolButton}"
+                        Width="170" Height="36" Margin="0,0,8,0" Click="ExportCsv_Click"/>
+                <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="13" Foreground="#7FE07F" Margin="14,0,0,0"/>
+            </StackPanel>
+
+            <!-- Channel selectors -->
+            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                     <RadioButton x:Name="RbTabCar"    Content="Car"    GroupName="Tabs" IsChecked="True"
                                  Style="{StaticResource TabButton}" Click="Tab_Click"/>
@@ -345,7 +354,7 @@
                     <RadioButton x:Name="RbTabBrakes" Content="Brakes" GroupName="Tabs"
                                  Style="{StaticResource TabButton}" Click="Tab_Click"/>
                     <RadioButton x:Name="RbTabStint" Content="Stint" GroupName="Tabs"
-                                 Style="{StaticResource TabButton}" Click="Tab_Click"/>                                 
+                                 Style="{StaticResource TabButton}" Click="Tab_Click"/>
 
                     <TextBlock Text="    X axis:" VerticalAlignment="Center" Margin="10,0,8,0" Foreground="#808085"/>
                     <RadioButton x:Name="RbTime" Content="Time" GroupName="Axis"
@@ -371,11 +380,11 @@
                     <TextBlock Text="Stint metrics:" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#808085"/>
                     <CheckBox x:Name="ChkStLapTime" Content="Lap time" IsChecked="True"
                               VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
-                    <CheckBox x:Name="ChkStTyreTemp" Content="Tyre temp" IsChecked="False"
+                    <CheckBox x:Name="ChkStTyreTemp" Content="Tyre temp" IsChecked="True"
                               VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
-                    <CheckBox x:Name="ChkStTyrePress" Content="Tyre pressure" IsChecked="False"
+                    <CheckBox x:Name="ChkStTyrePress" Content="Tyre pressure" IsChecked="True"
                               VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
-                    <CheckBox x:Name="ChkStTyreWear" Content="Tyre wear" IsChecked="False"
+                    <CheckBox x:Name="ChkStTyreWear" Content="Tyre wear" IsChecked="True"
                               VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
                     <CheckBox x:Name="ChkStSoC" Content="SoC" IsChecked="False"
                               VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
@@ -387,24 +396,38 @@
                               VerticalAlignment="Center" Margin="0,0,14,0" Click="StintExclude_Changed" Foreground="White"/>
 
                     <TextBlock Text="   " VerticalAlignment="Center"/>
-                    <CheckBox x:Name="ChkStintExclude" Content="Exclude anomalous" IsChecked="False"
-                              VerticalAlignment="Center" Click="StintExclude_Changed" Foreground="White"/>
-                </WrapPanel>              
+                    <CheckBox x:Name="ChkStintExclude" Content="Trim session" IsChecked="False"
+                            VerticalAlignment="Center" Click="StintExclude_Changed" Foreground="White"
+                            ToolTip="Remove first and last lap (out-lap / in-lap)"/>
+                </WrapPanel>
             </StackPanel>
 
-            <Border Grid.Column="1" x:Name="TrackMapBorder" Visibility="Collapsed"
+            <!-- Session info -->
+            <Border Grid.Row="2" Grid.Column="0" Padding="0,6">
+                <TextBlock x:Name="SessionInfo" FontSize="12.5" Foreground="#A0A0A5" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Track map: colonna destra, attraversa le 3 righe dell'header e si ferma lì -->
+            <Border Grid.Column="1" Grid.Row="0" Grid.RowSpan="3"
+                    x:Name="TrackMapBorder" Visibility="Collapsed"
                     Background="#212124" BorderBrush="#3A3A3E" BorderThickness="1"
-                    CornerRadius="4" Width="170" Height="120"
-                    VerticalAlignment="Top" Margin="8,0,0,0">
-                <Canvas x:Name="TrackMapCanvas" ClipToBounds="True"/>
+                    CornerRadius="4" Width="190" Margin="10,0,0,0"
+                    VerticalAlignment="Stretch">
+                <Grid>
+                    <Canvas x:Name="TrackMapCanvas" ClipToBounds="True"/>
+                    <TextBlock x:Name="TrackLenText"
+                               FontSize="10" FontWeight="SemiBold"
+                               Foreground="#B4B4B9"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Bottom"
+                               Margin="0,0,8,6"
+                               IsHitTestVisible="False"/>
+                </Grid>
             </Border>
         </Grid>
 
-        <!-- Session info -->
-        <TextBlock Grid.Row="2" x:Name="SessionInfo" FontSize="13" Foreground="#B0B0B0" Margin="0,0,0,8"/>
-
-        <!-- Main content: resizable split -->
-        <Grid Grid.Row="3">
+        <!-- ═══════════ MAIN (lista + lanes a tutta larghezza) ═══════════ -->
+        <Grid Grid.Row="1" Margin="0,10,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="300" MinWidth="240"/>
                 <ColumnDefinition Width="5"/>

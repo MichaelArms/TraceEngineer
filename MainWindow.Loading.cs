@@ -71,6 +71,8 @@ public partial class MainWindow : Window
             _allPoints = session.Points;
             _allLaps = session.Laps;
             RefreshChannelAvailability();
+            // Calcola distanza percorsa per tutti i punti (necessario per lunghezza tracciato e analisi stint)
+            ComputeDistance(_allPoints);            
 
             // Calcola info giri
             for (int i = 0; i < _allLaps.Count; i++)
@@ -80,101 +82,105 @@ public partial class MainWindow : Window
                 double endTime = (i + 1 < _allLaps.Count) ? _allLaps[i + 1].Time : _allPoints[^1].Time;
                 double lapTime = endTime - startTime;
 
+                // Calcola distanza percorsa nel giro
+                var startPt = _allPoints.FirstOrDefault(p => p.Time >= startTime);
+                var endPt = _allPoints.LastOrDefault(p => p.Time < endTime);
+                double distance = (endPt != null && startPt != null)
+                    ? endPt.Distance - startPt.Distance
+                    : 0;
+
                 _lapInfos.Add(new LapInfo
                 {
                     LapNumber = lap.LapNumber,
                     StartTime = startTime,
                     EndTime = endTime,
-                    LapTime = lapTime
+                    LapTime = lapTime,
+                    Distance = distance
                 });
             }
 
             LapList.ItemsSource = _lapInfos;
-            ComputeLapStats();
+            ComputeLapStats();             
 
-            // Costruzione mappa GPS al load (un giro completo)
+            // Costruzione mappa GPS al load
             _sessionMapRaw = null;
             _mapProfile = null;
-            var lapCandidates = new List<(int Index, int Count, List<TelemetryPoint> Points)>();
-            for (int i = 0; i < _lapInfos.Count; i++)
+
+            // 1. Trova il giro con la distanza massima (il giro "buono" più completo, esclude in/out-lap)
+            var bestLapInfo = _lapInfos.OrderByDescending(l => l.Distance).FirstOrDefault();
+            if (bestLapInfo != null)
             {
-                var lap = _lapInfos[i];
-                var pts = _allPoints.Where(p => p.Time >= lap.StartTime && p.Time < lap.EndTime)
-                                    .Where(p => p.MapX != 0 || p.MapY != 0)
-                                    .ToList();
-                if (pts.Count >= 100)
-                    lapCandidates.Add((i, pts.Count, pts));
-            }
-            if (lapCandidates.Count > 0)
-            {
-                // Preferisci giri "chiusi" (inizio ≈ fine = linea S/F) → giri lanciati.
-                // Out/in-lap partono o finiscono in pit e non si chiudono.
-                double spanX = 0, spanY = 0;
-                foreach (var c in lapCandidates)
+                var bestPoints = _allPoints.Where(p => p.Time >= bestLapInfo.StartTime && p.Time < bestLapInfo.EndTime)
+                                           .Where(p => p.MapX != 0 || p.MapY != 0)
+                                           .ToList();
+
+                if (bestPoints.Count >= 100)
                 {
-                    double mx = c.Points.Max(p => p.MapX), mnx = c.Points.Min(p => p.MapX);
-                    double my = c.Points.Max(p => p.MapY), mny = c.Points.Min(p => p.MapY);
-                    spanX = Math.Max(spanX, mx - mnx);
-                    spanY = Math.Max(spanY, my - mny);
-                }
-                double closeTh = 0.05 * Math.Max(spanX, spanY);
-                var closedLaps = lapCandidates
-                    .Where(x =>
+                    _sessionMapRaw = bestPoints;
+                    System.Diagnostics.Debug.WriteLine($"[Map] Using best lap {bestLapInfo.LapNumber} with {bestPoints.Count} GPS pts");
+
+                    // 2. Trova l'indice del punto con distanza minima (la linea di start/finish)
+                    int minDistIndex = 0;
+                    double minDist = bestPoints[0].Distance;
+                    for (int i = 1; i < bestPoints.Count; i++)
                     {
-                        var a = x.Points[0]; var b = x.Points[^1];
-                        double d = Math.Sqrt((a.MapX - b.MapX) * (a.MapX - b.MapX)
-                                           + (a.MapY - b.MapY) * (a.MapY - b.MapY));
-                        return d < closeTh;
-                    })
-                    .OrderByDescending(x => x.Count)
-                    .ToList();
-                var best = closedLaps.Count > 0
-                    ? closedLaps[0]
-                    : lapCandidates.OrderByDescending(x => x.Count).First();
-                _sessionMapRaw = best.Points;
-                System.Diagnostics.Debug.WriteLine(
-                    $"[Map] cached lap {best.Index + 1}: {best.Count} pts with GPS");
-
-                // Costruisci profilo proiettato
-                var raw = new List<(double X, double Y)>();
-                int step = Math.Max(1, best.Count / 600);
-                for (int i = 0; i < best.Count; i += step)
-                    raw.Add((best.Points[i].MapX, best.Points[i].MapY));
-
-                _mapRawMinX = raw.Min(p => p.X); _mapRawMaxX = raw.Max(p => p.X);
-                _mapRawMinY = raw.Min(p => p.Y); _mapRawMaxY = raw.Max(p => p.Y);
-
-                if (_mapRawMaxX - _mapRawMinX > 1e-9 && _mapRawMaxY - _mapRawMinY > 1e-9)
-                {
-                    // Proiezione: uso dimensioni fisse (170x120) perché il canvas non è ancora renderizzato
-                    double w = 170, h = 120, pad = 6;
-                    double sx = (w - 2 * pad) / (_mapRawMaxX - _mapRawMinX);
-                    double sy = (h - 2 * pad) / (_mapRawMaxY - _mapRawMinY);
-                    double s = Math.Min(sx, sy);
-                    double ox = pad + ((w - 2 * pad) - (_mapRawMaxX - _mapRawMinX) * s) / 2;
-                    double oy = pad + ((h - 2 * pad) - (_mapRawMaxY - _mapRawMinY) * s) / 2;
-
-                    _mapProfile = raw.Select(p => new Point(
-                        ox + (p.X - _mapRawMinX) * s,
-                        oy + (_mapRawMaxY - p.Y) * s  // Y flip: nord in alto
-                    )).ToList();
-                    _mapOutline = _mapProfile;
-
-                    // Calcola cumLen per PointAtArcFraction
-                    _mapCumLen = new List<double> { 0 };
-                    double acc = 0;
-                    for (int i = 1; i < _mapProfile.Count; i++)
-                    {
-                        acc += Point.Subtract(_mapProfile[i], _mapProfile[i - 1]).Length;
-                        _mapCumLen.Add(acc);
+                        if (bestPoints[i].Distance < minDist)
+                        {
+                            minDist = bestPoints[i].Distance;
+                            minDistIndex = i;
+                        }
                     }
-                    _mapTotalLen = acc;
-                    _mapHasGps = true;
+
+                    // 3. RUOTA la lista dei punti in modo che inizi e finisca alla linea di start/finish.
+                    // Questo chiude il circuito visivamente e allinea perfettamente le frazioni di distanza per TUTTI i giri.
+                    var rotatedPoints = bestPoints.Skip(minDistIndex).Concat(bestPoints.Take(minDistIndex)).ToList();
+
+                    // 4. Campiona per il disegno (max ~600 punti per performance)
+                    var raw = new List<(double X, double Y)>();
+                    int step = Math.Max(1, rotatedPoints.Count / 600);
+                    for (int i = 0; i < rotatedPoints.Count; i += step)
+                    {
+                        raw.Add((rotatedPoints[i].MapX, rotatedPoints[i].MapY));
+                    }
+
+                    _mapRawMinX = raw.Min(p => p.X); _mapRawMaxX = raw.Max(p => p.X);
+                    _mapRawMinY = raw.Min(p => p.Y); _mapRawMaxY = raw.Max(p => p.Y);
+
+                    if (_mapRawMaxX - _mapRawMinX > 1e-9 && _mapRawMaxY - _mapRawMinY > 1e-9)
+                    {
+                        // Dimensioni di riferimento per il calcolo iniziale
+                        double w = 170, h = 120; 
+                        double pad = 6;
+                        double sx = (w - 2 * pad) / (_mapRawMaxX - _mapRawMinX);
+                        double sy = (h - 2 * pad) / (_mapRawMaxY - _mapRawMinY);
+                        double s = Math.Min(sx, sy);
+                        double ox = pad + ((w - 2 * pad) - (_mapRawMaxX - _mapRawMinX) * s) / 2;
+                        double oy = pad + ((h - 2 * pad) - (_mapRawMaxY - _mapRawMinY) * s) / 2;
+
+                        _mapProfile = raw.Select(p => new Point(
+                            ox + (p.X - _mapRawMinX) * s,
+                            oy + (_mapRawMaxY - p.Y) * s  // Y flip: nord in alto
+                        )).ToList();
+                        
+                        _mapOutline = _mapProfile;
+
+                        // Calcola cumLen per PointAtArcFraction
+                        _mapCumLen = new List<double> { 0 };
+                        double acc = 0;
+                        for (int i = 1; i < _mapProfile.Count; i++)
+                        {
+                            acc += Point.Subtract(_mapProfile[i], _mapProfile[i - 1]).Length;
+                            _mapCumLen.Add(acc);
+                        }
+                        _mapTotalLen = acc;
+                        _mapHasGps = true;
+                    }
                 }
             }    
 
             // Rileva tracciato
             var meta = await Task.Run(() => _reader.ReadMetadata(filePath));
+            if (meta is null) meta = new Dictionary<string, string>();
             _currentTrackName = DetectTrackName(meta, filePath);
             _currentSessionDate = DetectDate(meta, filePath);
 
@@ -186,11 +192,19 @@ public partial class MainWindow : Window
                 ? $"{_currentTrackName}  •  {_currentSessionDate}"
                 : _currentSessionDate;
             SessionHeader.Text += "   •   " + DetectCarName(_reader.ReadMetadata(_selectedFile ?? ""));
+            
+            // Popola info sessione: circuito • numero giri • data
+            int lapCount = _lapInfos?.Count ?? 0;
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(_currentTrackName)) parts.Add(_currentTrackName);
+            parts.Add($"{lapCount} {(lapCount == 1 ? "lap" : "laps")}");
+            string dateTxt = FormatSessionDate(_currentSessionDate);
+                if (!string.IsNullOrWhiteSpace(dateTxt)) parts.Add(dateTxt);
+            SessionInfo.Text = string.Join("  •  ", parts);
 
-            BtnSaveLap.IsEnabled = _lapInfos.Count > 0;
+            BtnSaveLap.IsEnabled = (_lapInfos?.Count ?? 0) > 0;
             RefreshSavedList();
 
-            SessionInfo.Text = $"{_allPoints.Count:N0} campioni  |  {_lapInfos.Count} giri";
             StatusText.Text = "Session loaded. Select 1 or 2 laps.";
         }
         catch (Exception ex)

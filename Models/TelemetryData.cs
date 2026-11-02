@@ -158,6 +158,7 @@ public class LapInfo : INotifyPropertyChanged
     public double LapTime { get; set; }
     public double StartTime { get; set; }
     public double EndTime { get; set; }
+    public double Distance { get; set; }    
 
     public string LapTimeFormatted =>
         TimeSpan.FromSeconds(LapTime).ToString(@"hh\:mm\:ss\.fff");

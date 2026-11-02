@@ -29,4 +29,23 @@ public partial class MainWindow : Window
         return $"{ts.Minutes:00}:{ts.Seconds:00}.{ts.Milliseconds:000}";
     }
 
+
+    // Converte una data raw tipo "2026-11-01T17_56_32Z" in "2026 11 01"
+    internal static string FormatSessionDate(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+
+        // Gli underscore al posto dei due punti bloccano il parse: normalizziamo
+        string normalized = raw.Replace('_', ':');
+
+        if (DateTime.TryParse(normalized, CultureInfo.InvariantCulture,
+                                DateTimeStyles.RoundtripKind, out var dt))
+            return dt.ToString("yyyy/MM/dd");
+
+        // Fallback: se inizia con YYYY-MM-DD prendiamo solo quella parte
+        if (raw.Length >= 10 && raw[4] == '-' && raw[7] == '-')
+            return raw.Substring(0, 10).Replace('-', ' ');
+
+        return raw;
+    }
 }
