@@ -27,3 +27,5 @@ SavedLaps/
 
 docs/classes_architecture.png
 docs/general_architecture.png
+publish_*/
+*.zip

@@ -8,11 +8,15 @@
     <Nullable>enable</Nullable>
     <RootNamespace>TraceEngineer</RootNamespace>
     <AssemblyName>TraceEngineer</AssemblyName>
+    <ApplicationIcon>Assets\TraceEngineer.ico</ApplicationIcon>    
     <Version>0.6.2</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="DuckDB.NET.Data.Full" Version="1.2.0" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\TraceEngineer.ico" />
+  </ItemGroup>  
 
 </Project>
