@@ -124,7 +124,10 @@ public class DuckDbTelemetryReader
                 });
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            AppLog.Warn("Lap table could not be read: no lap markers", ex);
+        }
 
         EnrichHybridAndWear(session.Points, filePath);
         session.DebugInfo = debugInfo.ToString();
@@ -151,7 +154,10 @@ public class DuckDbTelemetryReader
                 if (!string.IsNullOrWhiteSpace(k)) result[k] = v;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Metadata could not be read: {Path.GetFileName(filePath)}", ex);
+        }
 
         return result;
     }
@@ -201,8 +207,9 @@ public class DuckDbTelemetryReader
             }
             return cols;
         }
-        catch 
+        catch (Exception ex)
         {
+            AppLog.Info($"Optional wheel table not available: {table}", ex);
             return null;
         }
     }
@@ -222,8 +229,9 @@ public class DuckDbTelemetryReader
             if (raw.Count == 0) return null;
             return Align(raw, masterCount);
         }
-        catch 
+        catch (Exception ex)
         {
+            AppLog.Info($"Optional table not available: {table}", ex);
             return null;
         }
     }
@@ -461,7 +469,7 @@ public class DuckDbTelemetryReader
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[GPS] failed: {ex.Message}");
+            AppLog.Warn("GPS track reconstruction failed", ex);
             return null;
         }
     }
@@ -479,7 +487,11 @@ public class DuckDbTelemetryReader
             using var r = c.ExecuteReader();
             return r.Read() ? r.GetString(0) : null;
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            AppLog.Info($"Table lookup failed for '{keyword}'", ex);
+            return null;
+        }
     }    
 
 }

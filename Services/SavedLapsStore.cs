@@ -73,7 +73,11 @@ public class SavedLapStore
                 var lap = JsonSerializer.Deserialize<SavedLap>(File.ReadAllText(f));
                 if (lap != null) list.Add((Path: f, Lap: lap));
             }
-            catch { /* file corrotto, lo saltiamo */ }
+            catch (Exception ex)
+            {
+                // file corrotto: lo saltiamo, ma lasciamo traccia
+                AppLog.Warn($"Saved lap skipped (unreadable): {Path.GetFileName(f)}", ex);
+            }
         }
 
         return list.OrderByDescending(x => x.Lap.SavedAtIso).ToList();
