@@ -1,6 +1,6 @@
-# LMU Telemetry Analyzer — Documentation
+# TraceEngineer — Documentation
 
-This folder contains the technical documentation for the LMU Telemetry Analyzer.
+This folder contains the technical documentation for TraceEngineer.
 
 | Document | Description |
 |----------|-------------|

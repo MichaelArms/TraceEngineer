@@ -9,7 +9,7 @@
     <RootNamespace>TraceEngineer</RootNamespace>
     <AssemblyName>TraceEngineer</AssemblyName>
     <ApplicationIcon>Assets\TraceEngineer.ico</ApplicationIcon>    
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
   </PropertyGroup>
 
   <ItemGroup>

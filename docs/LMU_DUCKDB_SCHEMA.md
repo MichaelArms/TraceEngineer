@@ -288,7 +288,7 @@ SELECT * FROM channelsList;
 ```markdown
 # Analysis Techniques
 
-How the LMU Telemetry Analyzer processes the raw DuckDB data.
+How TraceEngineer processes the raw DuckDB data.
 
 ## 1. Multi-rate alignment
 

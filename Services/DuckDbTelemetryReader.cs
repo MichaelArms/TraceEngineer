@@ -165,7 +165,7 @@ public class DuckDbTelemetryReader
         var result = new double[masterCount];
         int n = raw.Count;
         if (n == 0) return result;
-        if (n == 1) { for (int i = 0; i < masterCount; i++) result[i] = raw[0]; return result; }
+        if (n == 1 || masterCount == 1) { for (int i = 0; i < masterCount; i++) result[i] = raw[0]; return result; }
 
         for (int m = 0; m < masterCount; m++)
         {

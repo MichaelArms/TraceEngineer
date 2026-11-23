@@ -166,3 +166,4 @@ git clone https://github.com/MichaelArms/TraceEngineer.git
 cd TraceEngineer
 dotnet build
 dotnet run
+```
